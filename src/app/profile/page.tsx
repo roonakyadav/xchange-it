@@ -1,0 +1,314 @@
+'use client'
+
+import { motion } from 'framer-motion'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Image from 'next/image'
+import Link from 'next/link'
+import toast from 'react-hot-toast'
+import BottomNav from '@/components/BottomNav'
+import { getUser, updateUsernameEverywhere, getUserPosts, deletePost, deleteStorageFile } from '@/lib/db'
+import { profileSchema, type ProfileInput } from '@/lib/validators'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { formatTimeAgo } from '@/lib/time'
+import { useUser } from '@/hooks/useUser'
+import type { User, PostWithUser } from '@/types'
+
+export default function Profile() {
+    const router = useRouter()
+    const { user: currentUser, logout, loading: userLoading } = useUser()
+    const [posts, setPosts] = useState<PostWithUser[]>([])
+    const [loading, setLoading] = useState(true)
+    const [editing, setEditing] = useState(false)
+    const [saving, setSaving] = useState(false)
+
+    const {
+        register,
+        handleSubmit,
+        formState: { errors },
+        reset
+    } = useForm<ProfileInput>({
+        resolver: zodResolver(profileSchema)
+    })
+
+    useEffect(() => {
+        if (userLoading) return
+        if (!currentUser) {
+            router.push('/auth')
+            return
+        }
+
+        fetchUserPosts(currentUser.username)
+    }, [router, currentUser, userLoading])
+
+    const fetchUserPosts = async (username: string) => {
+        try {
+            // Fetch user's posts
+            const userPosts = await getUserPosts(username)
+            setPosts(userPosts)
+
+            reset({
+                name: currentUser!.name,
+                username: currentUser!.username
+            })
+        } catch (error) {
+            console.error('Error fetching user posts:', error)
+            toast.error('Failed to load profile')
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const onSubmit = async (data: ProfileInput) => {
+        if (!currentUser) return
+
+        setSaving(true)
+
+        try {
+            // If username changed, update everywhere
+            if (data.username !== currentUser.username) {
+                await updateUsernameEverywhere(currentUser.username, data.username)
+            }
+
+            // Update user info
+            const { supabase } = await import('@/lib/supabase')
+            const { error } = await supabase
+                .from('users')
+                .update({
+                    name: data.name,
+                    username: data.username
+                })
+                .eq('id', currentUser.id)
+
+            if (error) throw error
+
+            // The useUser hook will handle the localStorage update
+            setEditing(false)
+            toast.success('Profile updated successfully!')
+
+            // Refresh the page to get updated user data
+            window.location.reload()
+        } catch (error) {
+            console.error('Error updating profile:', error)
+            toast.error('Failed to update profile')
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const handleSignOut = () => {
+        logout()
+    }
+
+    const handleDeletePost = async (postId: string, imageUrl: string, e: React.MouseEvent) => {
+        e.stopPropagation() // Prevent navigation to post detail
+
+        if (!confirm('Are you sure you want to delete this post?')) {
+            return
+        }
+
+        try {
+            // Delete the image from storage first
+            await deleteStorageFile(imageUrl)
+
+            // Delete the post from database
+            await deletePost(postId)
+
+            // Remove from local state
+            setPosts(posts.filter(post => post.id !== postId))
+
+            toast.success('Post deleted successfully!')
+        } catch (error) {
+            console.error('Error deleting post:', error)
+            toast.error('Failed to delete post')
+        }
+    }
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-black p-4">
+                <div className="max-w-4xl mx-auto">
+                    <div className="animate-pulse space-y-6">
+                        <div className="h-32 bg-gray-800 rounded-lg"></div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {[...Array(6)].map((_, i) => (
+                                <div key={i} className="bg-gray-900 rounded-lg overflow-hidden">
+                                    <div className="aspect-square bg-gray-800"></div>
+                                    <div className="p-4 space-y-2">
+                                        <div className="h-4 bg-gray-800 rounded"></div>
+                                        <div className="h-3 bg-gray-800 rounded w-3/4"></div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
+    if (!currentUser) return null
+
+    return (
+        <div className="min-h-screen bg-black pt-16 md:pt-20">
+            <div className="max-w-4xl mx-auto p-4">
+                {/* Profile Info */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-gray-900 rounded-2xl p-6 mb-8"
+                >
+                    {editing ? (
+                        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                            <h2 className="text-xl font-semibold mb-4">Edit Profile</h2>
+
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Name</label>
+                                <input
+                                    {...register('name')}
+                                    type="text"
+                                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-2xl focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-colors text-white placeholder-gray-400"
+                                    placeholder="Your full name"
+                                />
+                                {errors.name && (
+                                    <p className="text-red-500 text-sm mt-1">{errors.name.message}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Username</label>
+                                <input
+                                    {...register('username')}
+                                    type="text"
+                                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-2xl focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-colors text-white placeholder-gray-400"
+                                    placeholder="Choose a username"
+                                />
+                                {errors.username && (
+                                    <p className="text-red-500 text-sm mt-1">{errors.username.message}</p>
+                                )}
+                                <p className="text-xs text-gray-500 mt-1">
+                                    3–20 characters, letters, numbers, and underscores only
+                                </p>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    type="submit"
+                                    disabled={saving}
+                                    className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white py-3 rounded-2xl font-medium transition-all duration-200 hover:shadow-lg hover:shadow-red-500/25 hover:scale-[1.02] active:scale-[0.98]"
+                                >
+                                    {saving ? 'Saving...' : 'Save Changes'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setEditing(false)}
+                                    className="px-6 py-3 border border-gray-600 rounded-2xl hover:bg-gray-800 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </form>
+                    ) : (
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h2 className="text-2xl font-bold mb-1">{currentUser.name}</h2>
+                                <p className="text-gray-400">@{currentUser.username}</p>
+                                <p className="text-sm text-gray-500 mt-2">{posts.length} posts</p>
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setEditing(true)}
+                                    className="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-2xl font-medium transition-colors"
+                                >
+                                    Edit Profile
+                                </button>
+                                <button
+                                    onClick={handleSignOut}
+                                    className="text-gray-400 hover:text-red-400 transition-colors text-sm px-4 py-2"
+                                >
+                                    Sign out
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </motion.div>
+
+                {/* Posts */}
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.2 }}
+                >
+                    <h3 className="text-xl font-semibold mb-6">Your Posts</h3>
+
+                    {posts.length === 0 ? (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="text-center py-16"
+                        >
+                            <p className="text-gray-400 text-lg mb-4">No posts yet</p>
+                            <Link
+                                href="/post/new"
+                                className="bg-red-500 hover:bg-red-600 px-6 py-3 rounded-2xl font-medium transition-colors inline-block"
+                            >
+                                Create your first post
+                            </Link>
+                        </motion.div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {posts.map((post, index) => (
+                                <motion.div
+                                    key={post.id}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: index * 0.1 }}
+                                    className="bg-gray-900 rounded-2xl overflow-hidden hover:bg-gray-800 transition-colors cursor-pointer relative group"
+                                    onClick={() => router.push(`/post/${post.id}`)}
+                                >
+                                    <div className="aspect-square relative">
+                                        <Image
+                                            src={post.image_url}
+                                            alt={post.title}
+                                            fill
+                                            className="object-cover"
+                                        />
+                                        <button
+                                            onClick={(e) => handleDeletePost(post.id, post.image_url, e)}
+                                            className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                            title="Delete post"
+                                        >
+                                            🗑️
+                                        </button>
+                                    </div>
+                                    <div className="p-4">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${post.mode === 'selling'
+                                                ? 'bg-green-500/20 text-green-400'
+                                                : 'bg-blue-500/20 text-blue-400'
+                                                }`}>
+                                                {post.mode === 'selling' ? 'Selling' : 'Requesting'}
+                                            </span>
+                                            <span className="text-xs text-gray-500">{formatTimeAgo(post.created_at)}</span>
+                                        </div>
+                                        <h4 className="font-semibold text-lg mb-1 line-clamp-1">{post.title}</h4>
+                                        <p className="text-gray-400 text-sm mb-2 line-clamp-2">{post.description}</p>
+                                        <div className="flex items-center justify-between text-xs text-gray-500">
+                                            <span>@{post.users?.username || 'unknown'}</span>
+                                            {post.location && (
+                                                <span>{post.location}</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            ))}
+                        </div>
+                    )}
+                </motion.div>
+            </div>
+
+            <BottomNav />
+        </div>
+    )
+}
