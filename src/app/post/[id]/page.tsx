@@ -16,7 +16,7 @@ interface Post {
     image_url: string
     username: string
     mode: 'selling' | 'requesting'
-    location?: string
+    price: string
     created_at: string
     users: {
         username: string
@@ -40,10 +40,6 @@ export default function PostDetail() {
 
     useEffect(() => {
         if (userLoading) return
-        if (!user) {
-            router.push('/auth')
-            return
-        }
 
         if (params.id) {
             fetchPost(params.id as string)
@@ -61,7 +57,7 @@ export default function PostDetail() {
           image_url,
           username,
           mode,
-          location,
+          price,
           created_at,
           users (
             username,
@@ -71,11 +67,18 @@ export default function PostDetail() {
                 .eq('id', postId)
                 .single()
 
-            if (error) throw error
+            if (error || !data) {
+                // Post not found or deleted - silently redirect to feed
+                router.push('/feed')
+                return
+            }
             setPost(data as unknown as Post)
         } catch (error) {
             console.error('Error fetching post:', error)
-            toast.error('Post not found')
+            // Only show error for actual network/server errors, not missing posts
+            if (error instanceof Error && !error.message.includes('No rows found')) {
+                toast.error('Failed to load post')
+            }
             router.push('/feed')
         } finally {
             setLoading(false)
@@ -83,7 +86,13 @@ export default function PostDetail() {
     }
 
     const handleMessageSeller = async () => {
-        if (!post || !user) return
+        if (!post) return
+
+        // If user is not logged in, redirect to auth
+        if (!user) {
+            router.push('/auth')
+            return
+        }
 
         // Don't allow messaging yourself
         if (post.users?.username === user.username) {
@@ -153,9 +162,9 @@ export default function PostDetail() {
         )
     }
 
-    if (!post || !user) return null
+    if (!post) return null
 
-    const isOwnPost = post.users?.username === user.username
+    const isOwnPost = post.users?.username === user?.username
 
     return (
         <div className="min-h-screen bg-black">
@@ -214,8 +223,10 @@ export default function PostDetail() {
                             <h1 className="text-2xl font-bold mb-2">{post.title}</h1>
                             <div className="flex items-center justify-between text-sm text-gray-400">
                                 <span>@{post.users?.username || 'unknown'}</span>
-                                {post.location && (
-                                    <span>📍 {post.location}</span>
+                                {post.price && (
+                                    <span className="text-sm font-bold bg-emerald-600 text-white px-2 py-1 rounded-full">
+                                        {post.price}
+                                    </span>
                                 )}
                             </div>
                         </div>

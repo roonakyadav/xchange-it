@@ -7,7 +7,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import toast from 'react-hot-toast'
 import { supabase } from '@/lib/supabase'
-import { postSchema, type PostInput } from '@/lib/validators'
+import { postSchema, type PostInput, type PostInputRaw } from '@/lib/validators'
 import { useUser } from '@/hooks/useUser'
 
 export default function NewPost() {
@@ -22,10 +22,9 @@ export default function NewPost() {
         handleSubmit,
         formState: { errors },
         setValue,
-        watch
-    } = useForm<PostInput>({
-        resolver: zodResolver(postSchema)
-    })
+        watch,
+        setError
+    } = useForm<PostInputRaw>()
 
     const image = watch('image')
     const mode = watch('mode')
@@ -52,23 +51,47 @@ export default function NewPost() {
         }
     }
 
-    const onSubmit = async (data: PostInput) => {
+    // Redirect to auth if not logged in
+    if (!userLoading && !user) {
+        router.push('/auth')
+        return null
+    }
+
+    const onSubmit = async (rawData: PostInputRaw) => {
         if (!user) {
             router.push('/auth')
             return
         }
 
+        // Custom validation: check price format with currency symbol
+        const priceValue = rawData.price.trim()
+        const PRICE_RE = /^\s*(?:[₹$€£¥]\s*\d+(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?\s*[₹$€£¥])\s*$/
+
+        if (!PRICE_RE.test(priceValue)) {
+            toast.error('Enter a valid price with currency, e.g. $200 or 200$')
+            setError('price', { message: 'Enter a valid price with currency, e.g. $200 or 200$' })
+            return
+        }
+
+        // Normalize price format while preserving user's symbol choice
+        const match = priceValue.match(PRICE_RE)!
+        let normalizedPrice = priceValue.trim()
+
+        // If it's prefix format (symbol first), keep as is
+        // If it's suffix format (symbol last), keep as is
+        // The regex ensures it's one or the other
+
         setLoading(true)
 
         try {
             // Upload image to Supabase storage
-            const fileExt = data.image.name.split('.').pop()
+            const fileExt = rawData.image.name.split('.').pop()
             const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
             const filePath = `${fileName}`
 
             const { error: uploadError } = await supabase.storage
                 .from('post-images')
-                .upload(filePath, data.image)
+                .upload(filePath, rawData.image)
 
             if (uploadError) {
                 console.error('Upload error:', uploadError)
@@ -83,12 +106,12 @@ export default function NewPost() {
 
             // Create post
             const { error: insertError } = await supabase.from("posts").insert({
-                title: data.title,
-                description: data.description,
+                title: rawData.title,
+                description: rawData.description,
                 image_url: publicUrl,
                 username: user.username,
-                mode: data.mode,
-                location: data.location,
+                mode: rawData.mode,
+                price: normalizedPrice,
             });
 
             if (insertError) {
@@ -239,21 +262,27 @@ export default function NewPost() {
                         )}
                     </motion.div>
 
-                    {/* Location */}
+                    {/* Price */}
                     <motion.div
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: 0.4 }}
                     >
-                        <label className="block text-sm font-medium mb-2">Location (optional)</label>
+                        <label className="block text-sm font-medium mb-2">Price *</label>
                         <input
-                            {...register('location')}
+                            {...register('price', {
+                                onChange: (e) => {
+                                    // Filter input to allow only digits, one dot, spaces, and currency symbols
+                                    const filtered = e.target.value.replace(/[^\d.\s₹$€£¥]/g, '')
+                                    e.target.value = filtered
+                                }
+                            })}
                             type="text"
                             className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-2xl focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-colors text-white placeholder-gray-400"
-                            placeholder="City, State"
+                            placeholder="Price (e.g. $200 or 200$)"
                         />
-                        {errors.location && (
-                            <p className="text-red-500 text-sm mt-1">{errors.location.message}</p>
+                        {errors.price && (
+                            <p className="text-red-500 text-sm mt-1">{errors.price.message}</p>
                         )}
                     </motion.div>
 

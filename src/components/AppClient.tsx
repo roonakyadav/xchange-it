@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation';
 import { getUser } from '@/lib/db';
 import type { User } from '@/types';
 import { useState } from 'react';
+import NavDesktop from './NavDesktop';
+import NavMobile from './NavMobile';
 
 export default function AppClient({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
@@ -41,5 +43,11 @@ export default function AppClient({ children }: { children: React.ReactNode }) {
         initializeUser();
     }, [router]);
 
-    return <>{children}</>;
+    return (
+        <>
+            <NavMobile />
+            <NavDesktop />
+            {children}
+        </>
+    );
 }

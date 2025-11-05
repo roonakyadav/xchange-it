@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import AppClient from "@/components/AppClient";
+import NavDesktop from "@/components/NavDesktop";
+import NavMobile from "@/components/NavMobile";
+import ClientProviders from "@/components/client-providers";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -26,9 +29,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
+        suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black text-white`}
       >
-        <AppClient>{children}</AppClient>
+        <ClientProviders>
+          <AppClient>{children}</AppClient>
+        </ClientProviders>
       </body>
     </html>
   );

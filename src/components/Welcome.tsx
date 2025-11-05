@@ -1,21 +1,16 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 export default function Welcome() {
     const router = useRouter()
 
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            // Mark welcome as seen
-            localStorage.setItem('x_seen_welcome', 'true')
-            router.push('/auth')
-        }, 1500) // 1.5 seconds as specified
-
-        return () => clearTimeout(timer)
-    }, [router])
+    const handleGetStarted = () => {
+        // Mark welcome as seen
+        localStorage.setItem('x_seen_welcome', 'true')
+        router.push('/feed')
+    }
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-black">
@@ -45,8 +40,17 @@ export default function Welcome() {
                     initial={{ scaleX: 0 }}
                     animate={{ scaleX: 1 }}
                     transition={{ delay: 0.9, duration: 0.8 }}
-                    className="w-32 h-1 bg-red-500 mx-auto rounded-full"
+                    className="w-32 h-1 bg-red-500 mx-auto rounded-full mb-8"
                 />
+                <motion.button
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 1.2, duration: 0.6 }}
+                    onClick={handleGetStarted}
+                    className="bg-red-500 hover:bg-red-600 text-white px-8 py-3 rounded-full font-medium transition-all duration-200 hover:shadow-lg hover:shadow-red-500/25 hover:scale-105 active:scale-95"
+                >
+                    Get Started
+                </motion.button>
             </motion.div>
         </div>
     )

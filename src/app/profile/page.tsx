@@ -1,13 +1,14 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import BottomNav from '@/components/BottomNav'
-import { getUser, updateUsernameEverywhere, getUserPosts, deletePost, deleteStorageFile } from '@/lib/db'
+import PostMenu from '@/components/PostMenu'
+import { getUser, updateUsernameEverywhere, getUserPosts, deletePostAndImage, deleteAccount, authenticateUser } from '@/lib/db'
 import { profileSchema, type ProfileInput } from '@/lib/validators'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -22,6 +23,9 @@ export default function Profile() {
     const [loading, setLoading] = useState(true)
     const [editing, setEditing] = useState(false)
     const [saving, setSaving] = useState(false)
+    const [showDeleteModal, setShowDeleteModal] = useState(false)
+    const [deletePassword, setDeletePassword] = useState('')
+    const [deletingAccount, setDeletingAccount] = useState(false)
 
     const {
         register,
@@ -41,6 +45,15 @@ export default function Profile() {
 
         fetchUserPosts(currentUser.username)
     }, [router, currentUser, userLoading])
+
+    useEffect(() => {
+        if (!userLoading && !currentUser) {
+            router.push('/auth')
+        }
+    }, [userLoading, currentUser, router])
+
+    if (userLoading) return null
+    if (!currentUser) return null
 
     const fetchUserPosts = async (username: string) => {
         try {
@@ -101,29 +114,52 @@ export default function Profile() {
         logout()
     }
 
-    const handleDeletePost = async (postId: string, imageUrl: string, e: React.MouseEvent) => {
-        e.stopPropagation() // Prevent navigation to post detail
+    const handleDeleteAccount = async () => {
+        if (!currentUser) return
 
-        if (!confirm('Are you sure you want to delete this post?')) {
-            return
-        }
+        setDeletingAccount(true)
 
         try {
-            // Delete the image from storage first
-            await deleteStorageFile(imageUrl)
+            // Verify password
+            const { user, error } = await authenticateUser(currentUser.username, deletePassword)
 
-            // Delete the post from database
-            await deletePost(postId)
+            if (error === 'wrong_password') {
+                toast.error('Wrong password')
+                setDeletingAccount(false)
+                return
+            }
 
-            // Remove from local state
-            setPosts(posts.filter(post => post.id !== postId))
+            if (!user) {
+                toast.error('Authentication failed')
+                setDeletingAccount(false)
+                return
+            }
 
-            toast.success('Post deleted successfully!')
+            // Delete account using user ID
+            await deleteAccount(currentUser.id)
+
+            // Clear localStorage
+            localStorage.removeItem('x_user')
+            localStorage.removeItem('x_seen_welcome')
+
+            // Show success toast and redirect
+            toast.success('Account deleted')
+            router.replace('/')
+
         } catch (error) {
-            console.error('Error deleting post:', error)
-            toast.error('Failed to delete post')
+            console.error('Error deleting account:', error)
+            toast.error('Failed to delete account')
+        } finally {
+            setDeletingAccount(false)
         }
     }
+
+    const handleSendFeedback = () => {
+        const mailtoLink = `mailto:ronakyadav1609@gmail.com?subject=Xchange Feedback&body=`
+        window.location.href = mailtoLink
+    }
+
+
 
     if (loading) {
         return (
@@ -151,7 +187,7 @@ export default function Profile() {
     if (!currentUser) return null
 
     return (
-        <div className="min-h-screen bg-black pt-16 md:pt-20">
+        <div className="min-h-screen bg-black pt-28 md:pt-20">
             <div className="max-w-4xl mx-auto p-4">
                 {/* Profile Info */}
                 <motion.div
@@ -216,12 +252,24 @@ export default function Profile() {
                                 <p className="text-gray-400">@{currentUser.username}</p>
                                 <p className="text-sm text-gray-500 mt-2">{posts.length} posts</p>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex flex-wrap gap-2">
                                 <button
                                     onClick={() => setEditing(true)}
                                     className="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-2xl font-medium transition-colors"
                                 >
                                     Edit Profile
+                                </button>
+                                <button
+                                    onClick={handleSendFeedback}
+                                    className="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-2xl font-medium transition-colors"
+                                >
+                                    Send Feedback
+                                </button>
+                                <button
+                                    onClick={() => setShowDeleteModal(true)}
+                                    className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-2xl font-medium transition-colors"
+                                >
+                                    Delete Account
                                 </button>
                                 <button
                                     onClick={handleSignOut}
@@ -257,58 +305,116 @@ export default function Profile() {
                             </Link>
                         </motion.div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {posts.map((post, index) => (
-                                <motion.div
-                                    key={post.id}
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: index * 0.1 }}
-                                    className="bg-gray-900 rounded-2xl overflow-hidden hover:bg-gray-800 transition-colors cursor-pointer relative group"
-                                    onClick={() => router.push(`/post/${post.id}`)}
-                                >
-                                    <div className="aspect-square relative">
-                                        <Image
-                                            src={post.image_url}
-                                            alt={post.title}
-                                            fill
-                                            className="object-cover"
-                                        />
-                                        <button
-                                            onClick={(e) => handleDeletePost(post.id, post.image_url, e)}
-                                            className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                                            title="Delete post"
-                                        >
-                                            🗑️
-                                        </button>
-                                    </div>
-                                    <div className="p-4">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${post.mode === 'selling'
-                                                ? 'bg-green-500/20 text-green-400'
-                                                : 'bg-blue-500/20 text-blue-400'
-                                                }`}>
-                                                {post.mode === 'selling' ? 'Selling' : 'Requesting'}
-                                            </span>
-                                            <span className="text-xs text-gray-500">{formatTimeAgo(post.created_at)}</span>
+                        <AnimatePresence>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {posts.map((post, index) => (
+                                    <motion.div
+                                        key={post.id}
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, scale: 0.95 }}
+                                        transition={{ delay: index * 0.1 }}
+                                        className="bg-gray-900 rounded-2xl overflow-hidden hover:bg-gray-800 transition-colors cursor-pointer relative group"
+                                        onClick={() => router.push(`/post/${post.id}`)}
+                                    >
+                                        <div className="aspect-square relative">
+                                            <Image
+                                                src={post.image_url}
+                                                alt={post.title}
+                                                fill
+                                                className="object-cover"
+                                            />
+                                            <PostMenu
+                                                postId={post.id}
+                                                imageUrl={post.image_url}
+                                                username={post.username}
+                                                currentUser={currentUser?.username}
+                                                onPostDeleted={() => fetchUserPosts(currentUser!.username)}
+                                            />
                                         </div>
-                                        <h4 className="font-semibold text-lg mb-1 line-clamp-1">{post.title}</h4>
-                                        <p className="text-gray-400 text-sm mb-2 line-clamp-2">{post.description}</p>
-                                        <div className="flex items-center justify-between text-xs text-gray-500">
-                                            <span>@{post.users?.username || 'unknown'}</span>
-                                            {post.location && (
-                                                <span>{post.location}</span>
-                                            )}
+                                        <div className="p-4">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${post.mode === 'selling'
+                                                    ? 'bg-green-500/20 text-green-400'
+                                                    : 'bg-blue-500/20 text-blue-400'
+                                                    }`}>
+                                                    {post.mode === 'selling' ? 'Selling' : 'Requesting'}
+                                                </span>
+                                                <span className="text-xs text-gray-500">{formatTimeAgo(post.created_at)}</span>
+                                            </div>
+                                            <h4 className="font-semibold text-lg mb-1 line-clamp-1">{post.title}</h4>
+                                            <p className="text-gray-400 text-sm mb-2 line-clamp-2">{post.description}</p>
+                                            <div className="flex items-center justify-between text-xs text-gray-500">
+                                                <span>@{post.users?.username || 'unknown'}</span>
+                                                {post.price && (
+                                                    <span className="text-sm font-bold bg-emerald-600 text-white px-2 py-1 rounded-full">
+                                                        {post.price}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                </motion.div>
-                            ))}
-                        </div>
+                                    </motion.div>
+                                ))}
+                            </div>
+                        </AnimatePresence>
                     )}
                 </motion.div>
             </div>
 
             <BottomNav />
+
+            {/* Delete Account Modal */}
+            <AnimatePresence>
+                {showDeleteModal && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                        onClick={() => setShowDeleteModal(false)}
+                    >
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-gray-900 rounded-2xl p-6 w-full max-w-md"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <h3 className="text-xl font-bold mb-4 text-center">Delete Account</h3>
+                            <p className="text-gray-400 mb-4 text-center">
+                                Enter password to confirm account deletion
+                            </p>
+
+                            <div className="mb-6">
+                                <input
+                                    type="password"
+                                    value={deletePassword}
+                                    onChange={(e) => setDeletePassword(e.target.value)}
+                                    placeholder="Enter your password"
+                                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-2xl focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-colors text-white placeholder-gray-400"
+                                />
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setShowDeleteModal(false)}
+                                    className="flex-1 px-4 py-3 border border-gray-600 rounded-2xl hover:bg-gray-800 transition-colors"
+                                    disabled={deletingAccount}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleDeleteAccount}
+                                    disabled={deletingAccount || !deletePassword.trim()}
+                                    className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white py-3 rounded-2xl font-medium transition-colors"
+                                >
+                                    {deletingAccount ? 'Deleting...' : 'Confirm'}
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     )
 }

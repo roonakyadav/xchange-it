@@ -5,6 +5,7 @@ export interface User {
     name: string
     username: string
     avatar_url?: string
+    password_hash: string
     created_at: string
 }
 
@@ -15,7 +16,7 @@ export interface Post {
     image_url: string
     username: string
     mode: PostMode
-    location?: string
+    price: string
     created_at: string
 }
 

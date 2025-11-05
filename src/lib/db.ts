@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import bcrypt from 'bcryptjs'
 import type { User, Post, Chat, Message, PostWithUser, ChatWithPost, ChatWithMessages } from '@/types'
 
 // User operations
@@ -32,14 +33,37 @@ export async function isUsernameTaken(username: string): Promise<boolean> {
     return !!data
 }
 
+export async function authenticateUser(username: string, password: string): Promise<{ user: User | null; error: 'user_not_found' | 'wrong_password' | null }> {
+    const user = await getUser(username)
+    if (!user) {
+        return { user: null, error: 'user_not_found' }
+    }
+
+    const isValidPassword = await bcrypt.compare(password, user.password_hash)
+    if (!isValidPassword) {
+        return { user: null, error: 'wrong_password' }
+    }
+
+    return { user, error: null }
+}
+
 export async function insertUser(user: {
     name: string
     username: string
+    password: string
     avatar_url?: string
 }): Promise<User> {
+    // Hash the password
+    const passwordHash = await bcrypt.hash(user.password, 12)
+
     const { data, error } = await supabase
         .from('users')
-        .insert(user)
+        .insert({
+            name: user.name,
+            username: user.username,
+            password_hash: passwordHash,
+            avatar_url: user.avatar_url
+        })
         .select()
         .single()
 
@@ -298,31 +322,171 @@ export async function getUserPosts(username: string): Promise<PostWithUser[]> {
 }
 
 export async function deletePost(id: string): Promise<void> {
-    const { error } = await supabase
+    console.log('Calling Supabase delete for post ID:', id)
+    const { data, error } = await supabase
         .from('posts')
         .delete()
         .eq('id', id)
+        .select()
+
+    console.log('Supabase delete response:', { data, error })
 
     if (error) {
+        console.error('Supabase delete error:', error)
         throw new Error(`Failed to delete post: ${error.message}`)
+    }
+
+    if (!data || data.length === 0) {
+        console.warn('No post was deleted, post ID may not exist:', id)
+    } else {
+        console.log('Successfully deleted post:', data)
     }
 }
 
 export async function deleteStorageFile(imageUrl: string): Promise<void> {
     // Extract file path from public URL
     // URL format: https://[project].supabase.co/storage/v1/object/public/post-images/[filename]
+    console.log('Extracting filename from URL:', imageUrl)
     const urlParts = imageUrl.split('/post-images/')
     if (urlParts.length !== 2) {
+        console.error('Invalid image URL format, could not find /post-images/ in URL')
         throw new Error('Invalid image URL format')
     }
 
-    const filePath = `post-images/${urlParts[1]}`
+    const filename = urlParts[1]
+    console.log('Extracted filename:', filename)
 
-    const { error } = await supabase.storage
+    console.log('Calling Supabase storage remove for file:', filename)
+    const { data, error } = await supabase.storage
         .from('post-images')
-        .remove([filePath])
+        .remove([filename])
+
+    console.log('Supabase storage remove response:', { data, error })
 
     if (error) {
+        console.error('Supabase storage remove error:', error)
         throw new Error(`Failed to delete storage file: ${error.message}`)
+    }
+
+    console.log('Successfully deleted storage file')
+}
+
+export async function deletePostAndImage(postId: string, imageUrl: string): Promise<void> {
+    console.log('Starting deletion of post:', postId, 'and image:', imageUrl)
+
+    // Delete the image first
+    console.log('Deleting image file...')
+    await deleteStorageFile(imageUrl)
+    console.log('Image deleted successfully')
+
+    // Then delete the post
+    console.log('Deleting post from database...')
+    await deletePost(postId)
+    console.log('Post deleted successfully')
+}
+
+export async function deleteAccount(userId: string): Promise<void> {
+    console.log('Starting account deletion for user ID:', userId)
+
+    // Get user data first
+    const { data: user, error: userFetchError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single()
+
+    if (userFetchError || !user) {
+        throw new Error(`User not found: ${userFetchError?.message || 'User does not exist'}`)
+    }
+
+    const username = user.username
+
+    try {
+        // 1. Delete all messages by this user (using sender username)
+        console.log('Deleting user messages...')
+        try {
+            const { error: messagesError } = await supabase
+                .from('messages')
+                .delete()
+                .eq('sender', username)
+
+            if (messagesError) {
+                console.error('Error deleting messages:', messagesError)
+            } else {
+                console.log('User messages deleted')
+            }
+        } catch (messagesError) {
+            console.error('Error deleting messages:', messagesError)
+        }
+
+        // 2. Delete all chats where user participated
+        console.log('Deleting user chats...')
+        try {
+            const { error: chatsError } = await supabase
+                .from('chats')
+                .delete()
+                .or(`user1.eq.${username},user2.eq.${username}`)
+
+            if (chatsError) {
+                console.error('Error deleting chats:', chatsError)
+            } else {
+                console.log('User chats deleted')
+            }
+        } catch (chatsError) {
+            console.error('Error deleting chats:', chatsError)
+        }
+
+        // 3. Delete all user's posts and their images (using username)
+        console.log('Deleting user posts...')
+        try {
+            const { data: userPosts, error: postsFetchError } = await supabase
+                .from('posts')
+                .select('id, image_url')
+                .eq('username', username)
+
+            if (postsFetchError) {
+                console.error('Error fetching user posts:', postsFetchError)
+            } else {
+                for (const post of userPosts || []) {
+                    console.log('Deleting post:', post.id)
+                    try {
+                        await deletePostAndImage(post.id, post.image_url)
+                    } catch (postError) {
+                        console.error('Error deleting post:', post.id, postError)
+                    }
+                }
+                console.log('All user posts deleted')
+            }
+        } catch (postsError) {
+            console.error('Error in posts deletion process:', postsError)
+        }
+
+        // 4. Delete user's avatar file if it exists
+        if (user.avatar_url) {
+            console.log('Deleting user avatar...')
+            try {
+                await deleteStorageFile(user.avatar_url)
+                console.log('User avatar deleted')
+            } catch (avatarError) {
+                console.warn('Failed to delete avatar, continuing:', avatarError)
+            }
+        }
+
+        // 5. Delete user from users table
+        console.log('Deleting user account...')
+        const { error: userError } = await supabase
+            .from('users')
+            .delete()
+            .eq('id', userId)
+
+        if (userError) {
+            console.error('Error deleting user:', userError)
+            throw new Error(`Failed to delete user: ${userError.message}`)
+        }
+        console.log('User account deleted successfully')
+
+    } catch (error) {
+        console.error('Critical error during account deletion:', error)
+        throw error
     }
 }

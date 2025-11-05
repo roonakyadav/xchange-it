@@ -14,11 +14,18 @@ export const signupSchema = z.object({
         .max(100, 'Name must be at most 100 characters')
         .trim(),
     username: usernameSchema,
+    password: z
+        .string()
+        .min(6, 'Password must be at least 6 characters')
+        .max(100, 'Password must be at most 100 characters'),
     avatar: z.instanceof(File).optional(),
 })
 
 export const signinSchema = z.object({
     username: usernameSchema,
+    password: z
+        .string()
+        .min(1, 'Password is required'),
 })
 
 export const postSchema = z.object({
@@ -33,11 +40,12 @@ export const postSchema = z.object({
         .max(2000, 'Description must be at most 2000 characters')
         .trim(),
     mode: z.enum(['selling', 'requesting'] as const),
-    location: z
+    price: z
         .string()
-        .max(80, 'Location must be at most 80 characters')
-        .trim()
-        .optional(),
+        .min(1, 'Price is required')
+        .regex(/^\d+$/, 'Enter a valid numeric price')
+        .transform((val) => parseInt(val, 10))
+        .refine((val) => !isNaN(val) && val >= 0, 'Enter a valid numeric price'),
     image: z
         .instanceof(File)
         .refine((file) => file.size <= 5 * 1024 * 1024, 'Image must be less than 5MB')
@@ -64,5 +72,12 @@ export const messageSchema = z.object({
 export type SignupInput = z.infer<typeof signupSchema>
 export type SigninInput = z.infer<typeof signinSchema>
 export type PostInput = z.infer<typeof postSchema>
+export type PostInputRaw = {
+    title: string
+    description: string
+    mode: 'selling' | 'requesting'
+    price: string
+    image: File
+}
 export type ProfileInput = z.infer<typeof profileSchema>
 export type MessageInput = z.infer<typeof messageSchema>

@@ -6,24 +6,13 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import BottomNav from '@/components/BottomNav'
+import PostMenu from '@/components/PostMenu'
 import ClientOnly from '@/components/ClientOnly'
 import { useUser } from '@/hooks/useUser'
 import { getPostsByMode } from '@/lib/db'
+import type { PostWithUser } from '@/types'
 
-interface Post {
-    id: string
-    title: string
-    description: string
-    image_url: string
-    username: string
-    mode: 'selling' | 'requesting'
-    location?: string
-    created_at: string
-    users: {
-        username: string
-        name: string
-    } | null
-}
+interface Post extends PostWithUser { }
 
 export default function Feed() {
     const router = useRouter()
@@ -34,10 +23,6 @@ export default function Feed() {
 
     useEffect(() => {
         if (userLoading) return
-        if (!user) {
-            router.push('/auth')
-            return
-        }
 
         fetchPosts()
     }, [router, selectedMode, user, userLoading])
@@ -87,7 +72,7 @@ export default function Feed() {
     }
 
     return (
-        <div className="min-h-screen bg-black pt-16 md:pt-20">
+        <div className="min-h-screen bg-black pt-28 md:pt-20">
             {/* Filter Tabs */}
             <div className="max-w-6xl mx-auto px-4 pt-4">
                 <div className="flex gap-2 mb-6">
@@ -146,6 +131,13 @@ export default function Feed() {
                                         fill
                                         className="object-cover"
                                     />
+                                    <PostMenu
+                                        postId={post.id}
+                                        imageUrl={post.image_url}
+                                        username={post.username}
+                                        currentUser={user?.username}
+                                        onPostDeleted={() => fetchPosts()}
+                                    />
                                 </div>
                                 <div className="p-4">
                                     <div className="flex items-center justify-between mb-2">
@@ -161,8 +153,10 @@ export default function Feed() {
                                     <p className="text-gray-400 text-sm mb-2 line-clamp-2">{post.description}</p>
                                     <div className="flex items-center justify-between text-xs text-gray-500">
                                         <span>@{post.users?.username || 'unknown'}</span>
-                                        {post.location && (
-                                            <span>{post.location}</span>
+                                        {post.price && (
+                                            <span className="text-sm font-bold bg-emerald-600 text-white px-2 py-1 rounded-full">
+                                                {post.price}
+                                            </span>
                                         )}
                                     </div>
                                 </div>

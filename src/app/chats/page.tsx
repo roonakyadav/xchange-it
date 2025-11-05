@@ -44,6 +44,12 @@ export default function Chats() {
         fetchChats(user.username)
     }, [router, user, userLoading])
 
+    // Redirect to auth if not logged in
+    if (!userLoading && !user) {
+        router.push('/auth')
+        return null
+    }
+
     const fetchChats = async (username: string) => {
         try {
             const { data, error } = await supabase

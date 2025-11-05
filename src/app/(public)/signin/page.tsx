@@ -7,7 +7,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import toast from 'react-hot-toast'
 import { signinSchema, type SigninInput } from '@/lib/validators'
-import { getUser } from '@/lib/db'
+import { authenticateUser } from '@/lib/db'
 import { useUser } from '@/hooks/useUser'
 
 export default function Signin() {
@@ -27,10 +27,23 @@ export default function Signin() {
         setLoading(true)
 
         try {
-            // Check if user exists
-            const user = await getUser(data.username)
-            if (!user) {
+            // Authenticate user
+            const { user, error } = await authenticateUser(data.username, data.password)
+
+            if (error === 'user_not_found') {
                 toast.error('Account not found. Please check your username or create a new account.')
+                setLoading(false)
+                return
+            }
+
+            if (error === 'wrong_password') {
+                toast.error('Incorrect password')
+                setLoading(false)
+                return
+            }
+
+            if (!user) {
+                toast.error('Failed to sign in')
                 setLoading(false)
                 return
             }
@@ -77,6 +90,24 @@ export default function Signin() {
                         />
                         {errors.username && (
                             <p className="text-red-500 text-sm mt-1">{errors.username.message}</p>
+                        )}
+                    </motion.div>
+
+                    {/* Password */}
+                    <motion.div
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.25 }}
+                    >
+                        <label className="block text-sm font-medium mb-2">Password</label>
+                        <input
+                            {...register('password')}
+                            type="password"
+                            className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-2xl focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-colors text-white placeholder-gray-400"
+                            placeholder="Enter your password"
+                        />
+                        {errors.password && (
+                            <p className="text-red-500 text-sm mt-1">{errors.password.message}</p>
                         )}
                     </motion.div>
 

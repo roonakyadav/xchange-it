@@ -89,6 +89,7 @@ export default function Signup() {
             await insertUser({
                 name: data.name,
                 username: data.username,
+                password: data.password,
                 avatar_url: avatarUrl
             })
 
@@ -192,6 +193,27 @@ export default function Signup() {
                         )}
                         <p className="text-xs text-gray-500 mt-1">
                             3–20 characters, letters, numbers, and underscores only
+                        </p>
+                    </motion.div>
+
+                    {/* Password */}
+                    <motion.div
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.35 }}
+                    >
+                        <label className="block text-sm font-medium mb-2">Password</label>
+                        <input
+                            {...register('password')}
+                            type="password"
+                            className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-2xl focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-colors text-white placeholder-gray-400"
+                            placeholder="Create a password"
+                        />
+                        {errors.password && (
+                            <p className="text-red-500 text-sm mt-1">{errors.password.message}</p>
+                        )}
+                        <p className="text-xs text-gray-500 mt-1">
+                            Minimum 6 characters
                         </p>
                     </motion.div>
 
