@@ -17,6 +17,7 @@ export interface Post {
     username: string
     mode: PostMode
     price: string
+    tags: string[]
     created_at: string
 }
 
@@ -40,10 +41,13 @@ export interface Message {
     chat_id: string
     sender: string
     body: string
+    type?: 'text' | 'media'
     created_at: string
     delivered_at?: string
     read_at?: string
     is_read?: boolean
+    reply_to_id?: string
+    reply_preview?: string
 }
 
 export interface PostWithUser extends Post {

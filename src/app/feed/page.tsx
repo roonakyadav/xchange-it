@@ -7,19 +7,27 @@ import Image from 'next/image'
 import Link from 'next/link'
 import BottomNav from '@/components/BottomNav'
 import PostMenu from '@/components/PostMenu'
+import EditPostModal from '@/components/EditPostModal'
 import ClientOnly from '@/components/ClientOnly'
 import { useUser } from '@/hooks/useUser'
 import { getPostsByMode } from '@/lib/db'
 import type { PostWithUser } from '@/types'
 
-interface Post extends PostWithUser { }
+interface Post extends PostWithUser {
+    category?: string
+}
 
 export default function Feed() {
     const router = useRouter()
     const { user, loading: userLoading } = useUser()
     const [posts, setPosts] = useState<Post[]>([])
+    const [filteredPosts, setFilteredPosts] = useState<Post[]>([])
     const [loading, setLoading] = useState(true)
     const [selectedMode, setSelectedMode] = useState<'selling' | 'requesting'>('selling')
+    const [searchTerm, setSearchTerm] = useState('')
+    const [activeCategory, setActiveCategory] = useState('All')
+    const [selectedPost, setSelectedPost] = useState<any>(null)
+    const [showEditModal, setShowEditModal] = useState(false)
 
     useEffect(() => {
         if (userLoading) return
@@ -36,6 +44,50 @@ export default function Feed() {
         window.addEventListener('feed-mode-change', handleModeChange as EventListener)
         return () => window.removeEventListener('feed-mode-change', handleModeChange as EventListener)
     }, [])
+
+    // Listen for search changes from NavDesktop
+    useEffect(() => {
+        const handleSearchChange = (event: CustomEvent<string>) => {
+            setSearchTerm(event.detail)
+        }
+
+        window.addEventListener('feed-search-change', handleSearchChange as EventListener)
+        return () => window.removeEventListener('feed-search-change', handleSearchChange as EventListener)
+    }, [])
+
+    // Listen for category changes from NavDesktop
+    useEffect(() => {
+        const handleCategoryChange = (event: CustomEvent<string>) => {
+            setActiveCategory(event.detail)
+        }
+
+        window.addEventListener('feed-category-change', handleCategoryChange as EventListener)
+        return () => window.removeEventListener('feed-category-change', handleCategoryChange as EventListener)
+    }, [])
+
+    // Filter posts based on search term and category
+    useEffect(() => {
+        let filtered = posts
+
+        // Apply search filter
+        if (searchTerm.trim()) {
+            const term = searchTerm.toLowerCase().trim()
+            filtered = filtered.filter(post => {
+                const titleMatch = post.title.toLowerCase().includes(term)
+                const descriptionMatch = post.description.toLowerCase().includes(term)
+                const tagsMatch = post.tags?.some(tag => tag.toLowerCase().includes(term)) || false
+
+                return titleMatch || descriptionMatch || tagsMatch
+            })
+        }
+
+        // Apply category filter
+        if (activeCategory !== 'All') {
+            filtered = filtered.filter(post => post.category === activeCategory)
+        }
+
+        setFilteredPosts(filtered)
+    }, [posts, searchTerm, activeCategory])
 
     const fetchPosts = async () => {
         try {
@@ -60,6 +112,12 @@ export default function Feed() {
         return postDate.toLocaleDateString()
     }
 
+    const onEditPost = (post: any) => {
+        console.log('📝 [FEED] onEditPost called with post:', post)
+        setSelectedPost(post)
+        setShowEditModal(true)
+    }
+
     if (loading) {
         return (
             <div className="min-h-screen bg-black p-4">
@@ -67,7 +125,7 @@ export default function Feed() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {[...Array(6)].map((_, i) => (
                             <div key={i} className="bg-gray-900 rounded-lg overflow-hidden animate-pulse">
-                                <div className="aspect-square bg-gray-800"></div>
+                                <div className="relative w-full bg-gray-800" style={{ paddingBottom: '100%' }}></div>
                                 <div className="p-4 space-y-2">
                                     <div className="h-4 bg-gray-800 rounded"></div>
                                     <div className="h-3 bg-gray-800 rounded w-3/4"></div>
@@ -81,37 +139,14 @@ export default function Feed() {
         )
     }
 
-    const filterButtons = (
-        <div className="flex gap-2">
-            <button
-                onClick={() => setSelectedMode('selling')}
-                className={`px-4 py-2 rounded-2xl font-medium transition-all duration-200 border ${selectedMode === 'selling'
-                    ? 'bg-red-500 text-white border-red-500'
-                    : 'border-gray-600 text-gray-400 hover:bg-white/10 hover:text-white'
-                    }`}
-            >
-                Selling
-            </button>
-            <button
-                onClick={() => setSelectedMode('requesting')}
-                className={`px-4 py-2 rounded-2xl font-medium transition-all duration-200 border ${selectedMode === 'requesting'
-                    ? 'bg-red-500 text-white border-red-500'
-                    : 'border-gray-600 text-gray-400 hover:bg-white/10 hover:text-white'
-                    }`}
-            >
-                Requesting
-            </button>
-        </div>
-    )
+
 
     return (
         <div className="min-h-screen bg-black flex flex-col pb-16 md:pb-0">
             {/* Feed */}
-            <div className="flex-1">
-                {/* Mobile Filter Buttons */}
-                <div className="md:hidden px-4 pt-4 pb-2">
-                    {filterButtons}
-                </div>
+            <div className="flex-1 pt-[110px] md:pt-0">
+
+
 
                 <div className="max-w-6xl mx-auto px-4 py-6">
                     {posts.length === 0 ? (
@@ -128,9 +163,17 @@ export default function Feed() {
                                 Create the first post
                             </Link>
                         </motion.div>
+                    ) : filteredPosts.length === 0 ? (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="text-center py-16"
+                        >
+                            <p className="text-gray-400 text-lg">No posts found</p>
+                        </motion.div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {posts.map((post, index) => (
+                            {filteredPosts.map((post, index) => (
                                 <motion.div
                                     key={post.id}
                                     initial={{ opacity: 0, y: 20 }}
@@ -139,12 +182,12 @@ export default function Feed() {
                                     className="bg-gray-900 rounded-lg overflow-hidden hover:bg-gray-800 transition-colors cursor-pointer"
                                     onClick={() => router.push(`/post/${post.id}`)}
                                 >
-                                    <div className="aspect-square relative">
+                                    <div className="relative w-full" style={{ paddingBottom: '100%' }}>
                                         <Image
                                             src={post.image_url}
                                             alt={post.title}
                                             fill
-                                            className="object-cover"
+                                            className="object-cover absolute inset-0"
                                         />
                                         <PostMenu
                                             postId={post.id}
@@ -152,6 +195,8 @@ export default function Feed() {
                                             username={post.username}
                                             currentUser={user?.username}
                                             onPostDeleted={() => fetchPosts()}
+                                            onPostEdit={onEditPost}
+                                            post={post}
                                         />
                                     </div>
                                     <div className="p-4">
@@ -166,6 +211,23 @@ export default function Feed() {
                                         </div>
                                         <h3 className="font-semibold text-lg mb-1 line-clamp-1">{post.title}</h3>
                                         <p className="text-gray-400 text-sm mb-2 line-clamp-2">{post.description}</p>
+                                        {post.tags && post.tags.length > 0 && (
+                                            <div className="flex flex-wrap gap-1 mb-2">
+                                                {post.tags.slice(0, 3).map((tag, tagIndex) => (
+                                                    <span
+                                                        key={tagIndex}
+                                                        className="px-2 py-1 bg-blue-500/20 text-blue-300 text-xs rounded-full border border-blue-500/30 hover:bg-blue-500/30 transition-colors"
+                                                    >
+                                                        {tag}
+                                                    </span>
+                                                ))}
+                                                {post.tags.length > 3 && (
+                                                    <span className="px-2 py-1 bg-gray-600/20 text-gray-400 text-xs rounded-full">
+                                                        +{post.tags.length - 3}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
                                         <div className="flex items-center justify-between text-xs text-gray-500">
                                             <span>@{post.users?.username || 'unknown'}</span>
                                             {post.price && (
@@ -182,6 +244,18 @@ export default function Feed() {
                 </div>
 
                 <BottomNav />
+
+                {/* Edit Post Modal */}
+                {showEditModal && selectedPost && (
+                    <EditPostModal
+                        post={selectedPost}
+                        onClose={() => {
+                            setShowEditModal(false)
+                            setSelectedPost(null)
+                        }}
+                        onUpdate={() => fetchPosts()}
+                    />
+                )}
             </div>
         </div>
     )

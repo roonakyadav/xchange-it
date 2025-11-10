@@ -43,6 +43,9 @@ export const postSchema = z.object({
     price: z
         .string()
         .min(1, 'Price is required'),
+    tags: z
+        .string()
+        .optional(),
     image: z
         .instanceof(File)
         .refine((file) => file.size <= 5 * 1024 * 1024, 'Image must be less than 5MB')
@@ -74,6 +77,7 @@ export type PostInputRaw = {
     description: string
     mode: 'selling' | 'requesting'
     price: string
+    tags?: string
     image: File
 }
 export type ProfileInput = z.infer<typeof profileSchema>

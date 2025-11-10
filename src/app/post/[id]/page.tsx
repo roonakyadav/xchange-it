@@ -18,6 +18,7 @@ interface Post {
     username: string
     mode: 'selling' | 'requesting'
     price: string
+    tags: string[]
     created_at: string
     users: {
         username: string
@@ -59,6 +60,7 @@ export default function PostDetail() {
           username,
           mode,
           price,
+          tags,
           created_at,
           users (
             username,
@@ -215,6 +217,19 @@ export default function PostDetail() {
                         </div>
 
                         <p className="text-gray-300 leading-relaxed">{post.description}</p>
+
+                        {post.tags && post.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-4">
+                                {post.tags.map((tag, tagIndex) => (
+                                    <span
+                                        key={tagIndex}
+                                        className="px-3 py-1 bg-blue-500/20 text-blue-300 text-sm rounded-full border border-blue-500/30 hover:bg-blue-500/30 transition-colors"
+                                    >
+                                        {tag}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
 
                         {/* Action Button */}
                         {!isOwnPost && (

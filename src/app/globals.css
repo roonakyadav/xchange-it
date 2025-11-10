@@ -16,13 +16,64 @@
 
 html,
 body {
-  height: 100%;
+  height: auto;
+  overflow-x: hidden;
   overflow-y: auto;
-  /* allow scroll when needed */
+  /* allow natural scrolling */
+}
+
+/* Prevent mobile keyboard viewport issues */
+input,
+textarea {
+  font-size: 16px;
+  /* prevent iOS zoom */
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slideDown {
+  animation: slideDown 0.25s ease-out;
+}
+
+.chat-bubble {
+  display: inline-block;
+  padding: 8px 12px;
+  border-radius: 16px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+
+@media (min-width: 640px) {
+  .chat-bubble {
+    font-size: 15px;
+  }
+}
+
+/* Mobile scrollbar hiding */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

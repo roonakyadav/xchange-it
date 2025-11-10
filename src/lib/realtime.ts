@@ -46,7 +46,7 @@ export function subscribeToMessages(
                                 return
                             }
                         } catch (error) {
-                            console.error('Error checking block status:', error)
+                            // Block check failed silently - allow message through
                         }
                     }
 

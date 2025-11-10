@@ -21,7 +21,7 @@ export function useChatMessages(chatId: string, currentUser?: string) {
             messages.forEach(msg => {
                 nextById[msg.id] = msg
             })
-            console.log('🧩 UPSERT count', incomingCount, 'store size', Object.keys(nextById).length)
+            // console.log('🧩 UPSERT count', incomingCount, 'store size', Object.keys(nextById).length)
             return nextById
         })
 
@@ -29,17 +29,16 @@ export function useChatMessages(chatId: string, currentUser?: string) {
             const nextOrder = [...prevOrder]
             messages.forEach(msg => {
                 if (!nextOrder.includes(msg.id)) {
-                    // Insert in chronological order
-                    const insertIndex = nextOrder.findIndex(id => {
-                        const existing = byId[id]
-                        return existing && new Date(existing.created_at) > new Date(msg.created_at)
-                    })
-                    if (insertIndex === -1) {
-                        nextOrder.push(msg.id)
-                    } else {
-                        nextOrder.splice(insertIndex, 0, msg.id)
-                    }
+                    // For new messages, append to end (assuming chronological order)
+                    nextOrder.push(msg.id)
                 }
+            })
+            // Sort by created_at to ensure correct order
+            nextOrder.sort((a, b) => {
+                const msgA = byId[a] || messages.find(m => m.id === a)
+                const msgB = byId[b] || messages.find(m => m.id === b)
+                if (!msgA || !msgB) return 0
+                return new Date(msgA.created_at).getTime() - new Date(msgB.created_at).getTime()
             })
             return nextOrder
         })

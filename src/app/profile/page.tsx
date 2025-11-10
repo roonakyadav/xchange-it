@@ -9,6 +9,7 @@ import toast from 'react-hot-toast'
 import { MoreVertical } from 'lucide-react'
 import BottomNav from '@/components/BottomNav'
 import PostMenu from '@/components/PostMenu'
+import EditPostModal from '@/components/EditPostModal'
 import { getUser, updateUsernameEverywhere, getUserPosts, deletePostAndImage, deleteAccount, authenticateUser } from '@/lib/db'
 import { profileSchema, type ProfileInput } from '@/lib/validators'
 import { useForm } from 'react-hook-form'
@@ -28,6 +29,8 @@ export default function Profile() {
     const [deletePassword, setDeletePassword] = useState('')
     const [deletingAccount, setDeletingAccount] = useState(false)
     const [showMenu, setShowMenu] = useState(false)
+    const [selectedPost, setSelectedPost] = useState<any>(null)
+    const [showEditModal, setShowEditModal] = useState(false)
     const menuRef = useRef<HTMLDivElement>(null)
 
     const {
@@ -172,6 +175,12 @@ export default function Profile() {
     const handleSendFeedback = () => {
         const mailtoLink = `mailto:ronakyadav1609@gmail.com?subject=Xchange Feedback&body=`
         window.location.href = mailtoLink
+    }
+
+    const onEditPost = (post: any) => {
+        console.log('📝 [PROFILE] onEditPost called with post:', post)
+        setSelectedPost(post)
+        setShowEditModal(true)
     }
 
 
@@ -454,6 +463,8 @@ export default function Profile() {
                                                     username={post.username}
                                                     currentUser={currentUser?.username}
                                                     onPostDeleted={() => fetchUserPosts(currentUser!.username)}
+                                                    onPostEdit={onEditPost}
+                                                    post={post}
                                                 />
                                             </div>
                                             <div className="p-4">
@@ -539,6 +550,18 @@ export default function Profile() {
                         </motion.div>
                     )}
                 </AnimatePresence>
+
+                {/* Edit Post Modal */}
+                {showEditModal && selectedPost && (
+                    <EditPostModal
+                        post={selectedPost}
+                        onClose={() => {
+                            setShowEditModal(false)
+                            setSelectedPost(null)
+                        }}
+                        onUpdate={() => fetchUserPosts(currentUser!.username)}
+                    />
+                )}
             </div>
         </div>
     )

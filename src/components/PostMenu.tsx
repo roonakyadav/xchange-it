@@ -10,9 +10,11 @@ interface PostMenuProps {
     username: string
     currentUser?: string | null
     onPostDeleted?: () => void
+    onPostEdit?: (post: any) => void
+    post?: any
 }
 
-export default function PostMenu({ postId, imageUrl, username, currentUser, onPostDeleted }: PostMenuProps) {
+export default function PostMenu({ postId, imageUrl, username, currentUser, onPostDeleted, onPostEdit, post }: PostMenuProps) {
     const [isOpen, setIsOpen] = useState(false)
     const [showReportModal, setShowReportModal] = useState(false)
     const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -96,26 +98,54 @@ export default function PostMenu({ postId, imageUrl, username, currentUser, onPo
             {isOpen && (
                 <div className="absolute top-12 right-2 bg-gray-900 border border-gray-700 rounded-lg shadow-lg z-10 min-w-[160px]">
                     <div className="py-1">
-                        {isOwner && (
-                            <button
-                                onClick={handleDelete}
-                                className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-800 transition-colors"
-                            >
-                                Delete post
-                            </button>
+                        {isOwner ? (
+                            // Owner's menu: Edit, Share, Delete
+                            <>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        setIsOpen(false)
+                                        console.log('🖊️ [POST_MENU] Edit clicked for post:', post?.id, post)
+                                        if (onPostEdit && post) {
+                                            onPostEdit(post)
+                                        } else {
+                                            console.error('❌ [POST_MENU] onPostEdit callback or post data missing')
+                                        }
+                                    }}
+                                    className="w-full text-left px-4 py-2 text-sm text-white hover:bg-gray-800 transition-colors"
+                                >
+                                    Edit post
+                                </button>
+                                <button
+                                    onClick={handleShare}
+                                    className="w-full text-left px-4 py-2 text-sm text-white hover:bg-gray-800 transition-colors"
+                                >
+                                    Share post
+                                </button>
+                                <button
+                                    onClick={handleDelete}
+                                    className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-800 transition-colors"
+                                >
+                                    Delete post
+                                </button>
+                            </>
+                        ) : (
+                            // Other user's menu: Share, Report
+                            <>
+                                <button
+                                    onClick={handleShare}
+                                    className="w-full text-left px-4 py-2 text-sm text-white hover:bg-gray-800 transition-colors"
+                                >
+                                    Share post
+                                </button>
+                                <button
+                                    onClick={handleReport}
+                                    className="w-full text-left px-4 py-2 text-sm text-white hover:bg-gray-800 transition-colors"
+                                >
+                                    Report post
+                                </button>
+                            </>
                         )}
-                        <button
-                            onClick={handleShare}
-                            className="w-full text-left px-4 py-2 text-sm text-white hover:bg-gray-800 transition-colors"
-                        >
-                            Share post
-                        </button>
-                        <button
-                            onClick={handleReport}
-                            className="w-full text-left px-4 py-2 text-sm text-white hover:bg-gray-800 transition-colors"
-                        >
-                            Report post
-                        </button>
                     </div>
                 </div>
             )}

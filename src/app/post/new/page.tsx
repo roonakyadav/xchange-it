@@ -1,7 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -9,6 +9,7 @@ import toast from 'react-hot-toast'
 import { supabase } from '@/lib/supabase'
 import { postSchema, type PostInput, type PostInputRaw } from '@/lib/validators'
 import { useUser } from '@/hooks/useUser'
+import { classifyCategory } from '../../../../@Integrations/geminiClient'
 
 export default function NewPost() {
     const router = useRouter()
@@ -52,8 +53,13 @@ export default function NewPost() {
     }
 
     // Redirect to auth if not logged in
+    useEffect(() => {
+        if (!userLoading && !user) {
+            router.push('/auth')
+        }
+    }, [userLoading, user, router])
+
     if (!userLoading && !user) {
-        router.push('/auth')
         return null
     }
 
@@ -104,6 +110,17 @@ export default function NewPost() {
                 .from('post-images')
                 .getPublicUrl(filePath)
 
+            // Parse tags
+            const tags = rawData.tags
+                ? rawData.tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
+                : []
+
+            // Classify category using Gemini AI
+            console.log("🏷️ [POST_CREATION] Starting category classification for:", rawData.title);
+            console.log("🔧 [POST_CREATION] Environment check - GEMINI_API_KEY:", !!process.env.GEMINI_API_KEY);
+            const category = await classifyCategory(rawData.title, rawData.description);
+            console.log("🏷️ [POST_CREATION] Category classified as:", category);
+
             // Create post
             const { error: insertError } = await supabase.from("posts").insert({
                 title: rawData.title,
@@ -112,6 +129,8 @@ export default function NewPost() {
                 username: user.username,
                 mode: rawData.mode,
                 price: normalizedPrice,
+                tags: tags,
+                category: category,
             });
 
             if (insertError) {
@@ -283,6 +302,24 @@ export default function NewPost() {
                         />
                         {errors.price && (
                             <p className="text-red-500 text-sm mt-1">{errors.price.message}</p>
+                        )}
+                    </motion.div>
+
+                    {/* Tags */}
+                    <motion.div
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.45 }}
+                    >
+                        <label className="block text-sm font-medium mb-2">Tags</label>
+                        <input
+                            {...register('tags')}
+                            type="text"
+                            className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-2xl focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-colors text-white placeholder-gray-400"
+                            placeholder="e.g. tech, subscription, netflix"
+                        />
+                        {errors.tags && (
+                            <p className="text-red-500 text-sm mt-1">{errors.tags.message}</p>
                         )}
                     </motion.div>
 

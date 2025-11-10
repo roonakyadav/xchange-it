@@ -195,12 +195,6 @@ export async function getOrCreateChat(options: {
     user2: string
     postId?: string
 }): Promise<Chat> {
-    // Check if users are blocked
-    const isBlocked = await isUserBlocked(options.user1, options.user2)
-    if (isBlocked) {
-        throw new Error('Cannot create chat with blocked user')
-    }
-
     // First try to find existing chat
     const { data: existingChat, error: findError } = await supabase
         .from('chats')
@@ -801,34 +795,7 @@ export async function deleteChat(chatId: string, currentUser: string): Promise<v
     }
 }
 
-export async function blockUser(blocker: string, blocked: string): Promise<void> {
-    const { error } = await supabase
-        .from('blocked_users')
-        .insert({
-            blocker_id: blocker,
-            blocked_id: blocked,
-        })
 
-    if (error) {
-        throw new Error(`Failed to block user: ${error.message}`)
-    }
-}
-
-export async function isUserBlocked(currentUser: string, targetUser: string) {
-    try {
-        const { data, error } = await supabase
-            .from('blocked_users')
-            .select('*')
-            .eq('blocker_id', currentUser)
-            .eq('blocked_id', targetUser)
-            .single()
-        if (error && error.code !== 'PGRST116') throw error
-        return !!data
-    } catch (err) {
-        console.error('Error checking block status:', err)
-        return false
-    }
-}
 
 // Chat preview functions for chat list
 export interface ChatPreview {
@@ -891,20 +858,6 @@ export async function getVisibleChats(username: string): Promise<ChatPreview[]> 
         }
 
         const otherUser = chat.user1 === username ? chat.user2 : chat.user1
-
-        // Check if the other user is blocked by current user
-        const isBlockedByMe = await isUserBlocked(username, otherUser)
-        if (isBlockedByMe) {
-            console.log(`🚫 [GET_VISIBLE_CHATS] Skipping chat with blocked user: ${chat.id}`)
-            continue
-        }
-
-        // Check if current user is blocked by the other user
-        const isBlockedByOther = await isUserBlocked(otherUser, username)
-        if (isBlockedByOther) {
-            console.log(`🚫 [GET_VISIBLE_CHATS] Skipping chat where current user is blocked: ${chat.id}`)
-            continue
-        }
 
         // Get all messages for this chat to calculate unread counts
         const { data: messages, error: messagesError } = await supabase
