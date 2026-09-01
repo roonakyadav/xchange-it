@@ -217,7 +217,6 @@ export default function Profile() {
     }
 
     const onEditPost = (post: any) => {
-        console.log('📝 [PROFILE] onEditPost called with post:', post)
         setSelectedPost(post)
         setShowEditModal(true)
     }

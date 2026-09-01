@@ -268,11 +268,12 @@ export default function NewPost() {
 
             // Parse tags
             const tags = rawData.tags
-                ? rawData.tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
+                ? rawData.tags.split(',')
+                    .map(tag => tag.trim())
+                    .filter(tag => tag.length > 0)
                 : []
 
             // Classify category using AI (analyzes image, title, and description)
-            console.log("🏷️ [POST_CREATION] Starting AI category classification for:", rawData.title);
             const response = await fetch('/api/autoCategorize', {
                 method: 'POST',
                 headers: {
@@ -286,7 +287,6 @@ export default function NewPost() {
             });
             const data = await response.json();
             const category = data.category;
-            console.log("🏷️ [POST_CREATION] Category classified as:", category);
 
             // Create post
             const { error: insertError } = await supabase.from("posts").insert({

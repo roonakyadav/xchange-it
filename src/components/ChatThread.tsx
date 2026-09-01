@@ -196,7 +196,6 @@ export default function ChatThread({ chatId }: ChatThreadProps) {
     useEffect(() => {
         if (!user || !chat) return
 
-        console.log('Setting up typing subscriptions for chat:', chatId)
         const otherUserId = chat.user1_id === user.id ? chat.user2_id : chat.user1_id
 
         // Subscribe to typing indicators
@@ -210,7 +209,6 @@ export default function ChatThread({ chatId }: ChatThreadProps) {
         messageChannelsRef.current = [typingChannel]
 
         return () => {
-            console.log('Cleaning up typing subscriptions for chat:', chatId)
             messageChannelsRef.current.forEach(channel => channel.unsubscribe())
             messageChannelsRef.current = []
         }
@@ -220,7 +218,6 @@ export default function ChatThread({ chatId }: ChatThreadProps) {
     useEffect(() => {
         const handleChatDeleted = (event: CustomEvent<{ chatId: string }>) => {
             if (event.detail.chatId === chatId) {
-                console.log('Chat deleted, cleaning up subscriptions for chat:', chatId)
                 messageChannelsRef.current.forEach(channel => {
                     channel.unsubscribe()
                 })

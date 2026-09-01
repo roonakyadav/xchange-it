@@ -382,9 +382,9 @@ export async function deletePostAndImage(postId: string, imageUrl?: string): Pro
         // Use cascade deletion for post and related data
         await deletePostCascade(postId)
 
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error('Delete failed:', err)
-        throw new Error(err.message || 'Failed to delete post')
+        throw new Error(err instanceof Error ? err.message : 'Failed to delete post')
     }
 }
 
@@ -544,7 +544,13 @@ export async function sendMessage({ chatId, senderId, body }: { chatId: string; 
     console.log('✅ [SEND_MESSAGE] Message inserted:', message.id)
 
     // Update chat with last message info (deterministic upsert)
-    const updateData: any = {
+    const updateData: {
+        last_message: string
+        last_sender_id: string
+        updated_at: string
+        unread_user1?: number
+        unread_user2?: number
+    } = {
         last_message: body,
         last_sender_id: senderId,
         updated_at: new Date().toISOString()
@@ -622,43 +628,20 @@ export async function markDelivered(chatId: string, messageIds: string[]): Promi
 export async function markThreadRead(chatId: string, myUserId: string) {
     console.log('🔖 [MARK_THREAD_READ] chatId:', chatId, 'user:', myUserId)
 
-    // Get chat details first to determine which field to update
-    const chat = await getChatById(chatId)
-    if (!chat) {
-        throw new Error('Chat not found')
+    // Use SECURITY DEFINER function to mark messages as read
+    // This bypasses RLS to allow marking messages from other participants as read
+    const { data, error } = await getClient()
+        .rpc('mark_messages_read', {
+            chat_id: chatId,
+            reader_id: myUserId
+        })
+
+    if (error) {
+        console.error('❌ [MARK_THREAD_READ] Failed to mark messages as read:', error)
+        throw new Error(`Failed to mark thread read: ${error.message}`)
     }
 
-    // First mark messages as read
-    const { data: updatedMessages, error: messageError } = await getClient()
-        .from('messages')
-        .update({ is_read: true, read_at: new Date().toISOString() })
-        .eq('chat_id', chatId)
-        .neq('sender_id', myUserId)
-        .eq('is_read', false)
-        .select()
-
-    if (messageError) {
-        console.error('❌ [MARK_THREAD_READ] Failed to mark messages as read:', messageError)
-        throw new Error(`Failed to mark thread read: ${messageError.message}`)
-    }
-
-    console.log(`✅ [MARK_THREAD_READ] Marked ${updatedMessages?.length || 0} messages as read`)
-
-    // Reset unread counter for current user in chat table
-    const updateField = chat.user1_id === myUserId ? 'unread_user1' : 'unread_user2'
-    const { error: chatError } = await getClient()
-        .from('chats')
-        .update({ [updateField]: 0 })
-        .eq('id', chatId)
-
-    if (chatError) {
-        console.error('❌ [MARK_THREAD_READ] Failed to reset unread counter:', chatError)
-        // Don't throw here - messages were marked as read successfully
-    } else {
-        console.log('✅ [MARK_THREAD_READ] Reset unread counter in chat table')
-    }
-
-    return updatedMessages
+    console.log(`✅ [MARK_THREAD_READ] Marked ${data || 0} messages as read`)
 }
 
 export async function deleteChatForMe(chatId: string, myUserId: string, user1Id: string, user2Id: string) {

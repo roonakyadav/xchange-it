@@ -30,13 +30,11 @@ export default function ChatList({ onChatSelect, selectedChatId, searchQuery }: 
 
         // Subscribe to chat updates (for deletions, new chats, etc.)
         const chatChannel = subscribeToChatUpdates(user.username, () => {
-            console.log('Chat list update detected, reloading chats')
             loadChats()
         })
 
         // Listen for chat deletion events
         const handleChatDeleted = (event: CustomEvent<{ chatId: string }>) => {
-            console.log('Chat deleted event received:', event.detail.chatId)
             setChats(prev => prev.filter(chat => chat.id !== event.detail.chatId))
         }
 
@@ -66,7 +64,7 @@ export default function ChatList({ onChatSelect, selectedChatId, searchQuery }: 
         if (!user) return
 
         try {
-            const chatData = await getVisibleChats(user.username)
+            const chatData = await getVisibleChats(user.id)
             setChats(chatData)
         } catch (error) {
             console.error('Failed to load chats:', error)

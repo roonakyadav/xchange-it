@@ -212,7 +212,6 @@ export default function Feed() {
     }
 
     const onEditPost = (post: any) => {
-        console.log('📝 [FEED] onEditPost called with post:', post)
         setSelectedPost(post)
         setShowEditModal(true)
     }

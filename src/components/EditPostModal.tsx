@@ -26,10 +26,6 @@ export default function EditPostModal({ post, onClose, onUpdate }: EditPostModal
         setLoading(true)
         try {
             const supabase = createClient()
-            console.log('🔄 [EDIT_POST] Starting update for post:', post.id)
-            console.log('📝 [EDIT_POST] Form data:', formData)
-            console.log('👤 [EDIT_POST] Post owner:', post.username)
-
             // First check if post exists and user owns it
             const { data: existingPost, error: fetchError } = await supabase
                 .from('posts')
@@ -38,26 +34,19 @@ export default function EditPostModal({ post, onClose, onUpdate }: EditPostModal
                 .single()
 
             if (fetchError) {
-                console.error('❌ [EDIT_POST] Error fetching post:', fetchError)
                 toast.error('Failed to verify post ownership')
                 return
             }
 
             if (!existingPost) {
-                console.error('❌ [EDIT_POST] Post not found')
                 toast.error('Post not found')
                 return
             }
 
-            console.log('✅ [EDIT_POST] Post exists, owner:', existingPost.username)
-
             if (existingPost.username !== post.username) {
-                console.error('❌ [EDIT_POST] Ownership mismatch')
                 toast.error('You can only edit your own posts')
                 return
             }
-
-            console.log('🔄 [EDIT_POST] Updating post...')
 
             // Update the post
             const { data, error } = await supabase
@@ -71,22 +60,13 @@ export default function EditPostModal({ post, onClose, onUpdate }: EditPostModal
                 .select()
 
             if (error) {
-                console.error('❌ [EDIT_POST] Update error:', error)
-                console.error('❌ [EDIT_POST] Error details:', {
-                    message: error.message,
-                    details: error.details,
-                    hint: error.hint,
-                    code: error.code
-                })
                 toast.error(`Failed to update post: ${error.message}`)
             } else {
-                console.log('✅ [EDIT_POST] Update successful:', data)
                 toast.success('Post updated successfully!')
                 onUpdate()
                 onClose()
             }
         } catch (error: any) {
-            console.error('❌ [EDIT_POST] Unexpected error:', error)
             toast.error(`Failed to update post: ${error.message || 'Unknown error'}`)
         } finally {
             setLoading(false)

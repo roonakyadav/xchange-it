@@ -21,11 +21,11 @@ export default function ChatMenu({ chatId, otherUser }: ChatMenuProps) {
     useEffect(() => {
         const fetchBlock = async () => {
             if (!user) return
-            const blocked = await isUserBlocked(user.username, otherUser)
+            const blocked = await isUserBlocked(user.id, otherUser)
             setIsBlocked(blocked)
         }
         fetchBlock()
-    }, [user?.username, otherUser])
+    }, [user?.id, otherUser])
 
     const handleBlockToggle = async () => {
         if (!user) return
@@ -36,12 +36,12 @@ export default function ChatMenu({ chatId, otherUser }: ChatMenuProps) {
             if (isBlocked) {
                 await supabase.from('blocked_users')
                     .delete()
-                    .eq('blocker_id', user.username)
+                    .eq('blocker_id', user.id)
                     .eq('blocked_id', otherUser)
                 toast.success('User unblocked')
             } else {
                 await supabase.from('blocked_users')
-                    .insert([{ blocker_id: user.username, blocked_id: otherUser }])
+                    .insert([{ blocker_id: user.id, blocked_id: otherUser }])
                 toast.success('User blocked')
             }
             setIsBlocked(!isBlocked)

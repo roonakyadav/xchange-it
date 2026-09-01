@@ -12,7 +12,7 @@ export async function proxy(request: NextRequest) {
     )
   }
 
-  let supabaseResponse = NextResponse.next({
+  const supabaseResponse = NextResponse.next({
     request,
   })
 
@@ -38,9 +38,7 @@ export async function proxy(request: NextRequest) {
   // supabase.auth.getUser(). A simple mistake could make it very hard to debug
   // issues with users being randomly logged out.
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  await supabase.auth.getUser()
 
   // Optional: Add auth protection logic here if needed
   // if (!user && request.nextUrl.pathname.startsWith('/protected')) {

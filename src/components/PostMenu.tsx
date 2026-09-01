@@ -4,16 +4,17 @@ import { useState, useRef, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { deletePostAndImage, savePost, unsavePost, isPostSaved } from '@/lib/db'
 import { useUser } from '@/hooks/useUser'
+import type { PostWithUser } from '@/types'
 
 interface PostMenuProps {
     postId: string
     imageUrl: string
     currentUserId?: string | null
     onPostDeleted?: () => void
-    onPostEdit?: (post: any) => void
+    onPostEdit?: (post: PostWithUser) => void
     onPostSaved?: () => void
     onPostUnsaved?: () => void
-    post?: any
+    post?: PostWithUser
 }
 
 export default function PostMenu({ postId, imageUrl, currentUserId, onPostDeleted, onPostEdit, onPostSaved, onPostUnsaved, post }: PostMenuProps) {

@@ -16,14 +16,32 @@ export default function NavDesktop() {
     const pathname = usePathname()
     const { user } = useUser()
     const hidden = useScrollHide(50) // Hide after 50px scroll
-    const [sellingMode, setSellingMode] = useState<'Selling' | 'Requesting'>('Selling')
+    const [sellingMode, setSellingMode] = useState<'Selling' | 'Requesting'>(() => {
+        if (typeof window === 'undefined') return 'Selling'
+        const saved = localStorage.getItem('feed-mode')
+        if (saved === 'selling' || saved === 'requesting') {
+            return saved === 'selling' ? 'Selling' : 'Requesting'
+        }
+        return 'Selling'
+    })
     const [activeCategory, setActiveCategory] = useState('All')
     const [searchTerm, setSearchTerm] = useState('')
     const [hasUnread, setHasUnread] = useState(false)
     const [isSearchActive, setIsSearchActive] = useState(false)
     const [isDesktop, setIsDesktop] = useState(false)
     const [isMobile, setIsMobile] = useState(false)
-    const [recentSearches, setRecentSearches] = useState<string[]>([])
+    const [recentSearches, setRecentSearches] = useState<string[]>(() => {
+        if (typeof window === 'undefined') return []
+        const saved = localStorage.getItem('recent-searches')
+        if (saved) {
+            try {
+                return JSON.parse(saved)
+            } catch (error) {
+                return []
+            }
+        }
+        return []
+    })
 
     // Check if desktop and mobile
     useEffect(() => {
@@ -52,26 +70,6 @@ export default function NavDesktop() {
         }
         return pathname.startsWith(href)
     }
-
-    // Load selected mode from localStorage
-    useEffect(() => {
-        const saved = localStorage.getItem('feed-mode')
-        if (saved === 'selling' || saved === 'requesting') {
-            setSellingMode(saved === 'selling' ? 'Selling' : 'Requesting')
-        }
-    }, [])
-
-    // Load recent searches from localStorage
-    useEffect(() => {
-        const saved = localStorage.getItem('recent-searches')
-        if (saved) {
-            try {
-                setRecentSearches(JSON.parse(saved))
-            } catch (error) {
-                console.error('Failed to parse recent searches:', error)
-            }
-        }
-    }, [])
 
     const handleModeChange = (mode: 'Selling' | 'Requesting') => {
         setSellingMode(mode)
