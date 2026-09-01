@@ -3,9 +3,10 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
+import type { PostWithUser } from '@/types'
 
 interface EditPostModalProps {
-    post: any
+    post: PostWithUser
     onClose: () => void
     onUpdate: () => void
 }
@@ -43,7 +44,7 @@ export default function EditPostModal({ post, onClose, onUpdate }: EditPostModal
                 return
             }
 
-            if (existingPost.username !== post.username) {
+            if (existingPost.users?.username !== post.users?.username) {
                 toast.error('You can only edit your own posts')
                 return
             }
@@ -66,8 +67,9 @@ export default function EditPostModal({ post, onClose, onUpdate }: EditPostModal
                 onUpdate()
                 onClose()
             }
-        } catch (error: any) {
-            toast.error(`Failed to update post: ${error.message || 'Unknown error'}`)
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+            toast.error(`Failed to update post: ${errorMessage}`)
         } finally {
             setLoading(false)
         }

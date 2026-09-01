@@ -13,7 +13,16 @@ import BottomNav from '@/components/BottomNav'
 export default function Chats() {
     const router = useRouter()
     const { user, loading } = useUser()
-    const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
+    const [selectedChatId, setSelectedChatId] = useState<string | null>(() => {
+        if (typeof window !== 'undefined') {
+            const pathSegments = window.location.pathname.split('/')
+            const chatIdFromUrl = pathSegments[pathSegments.length - 1]
+            if (chatIdFromUrl && chatIdFromUrl !== 'chats') {
+                return chatIdFromUrl
+            }
+        }
+        return null
+    })
     const [isMobile, setIsMobile] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
 
@@ -32,7 +41,7 @@ export default function Chats() {
         checkMobile()
         window.addEventListener('resize', checkMobile)
         return () => window.removeEventListener('resize', checkMobile)
-    }, [])
+    }, [setIsMobile])
 
     // Handle mobile back navigation
     useEffect(() => {
@@ -56,16 +65,6 @@ export default function Chats() {
             window.removeEventListener('keydown', handleKeyDown)
         }
     }, [isMobile, selectedChatId])
-
-    // Handle URL-based chat selection
-    useEffect(() => {
-        const pathSegments = window.location.pathname.split('/')
-        const chatIdFromUrl = pathSegments[pathSegments.length - 1]
-
-        if (chatIdFromUrl && chatIdFromUrl !== 'chats' && chatIdFromUrl !== selectedChatId) {
-            setSelectedChatId(chatIdFromUrl)
-        }
-    }, [])
 
     const handleChatSelect = (chatId: string) => {
         setSelectedChatId(chatId)

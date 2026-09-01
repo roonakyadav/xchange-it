@@ -7,8 +7,9 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 export function useChatMessages(chatId: string, currentUserId?: string) {
     const [byId, setById] = useState<Record<string, Message>>({})
     const [order, setOrder] = useState<string[]>([])
+    const [isSubscribed, setIsSubscribed] = useState(false)
     const channelRef = useRef<RealtimeChannel | null>(null)
-    const isSubscribedRef = useRef(false)
+    const hasSetupRef = useRef(false)
 
     const messages = order.map(id => byId[id]).filter(Boolean)
 
@@ -55,8 +56,9 @@ export function useChatMessages(chatId: string, currentUserId?: string) {
         }
     }, [chatId, upsertMessages])
 
-    const setupRealtimeSubscription = useCallback(() => {
-        if (!chatId || !currentUserId || isSubscribedRef.current) return
+    // Setup realtime subscription
+    useEffect(() => {
+        if (!chatId || !currentUserId || hasSetupRef.current) return
 
         console.log(`🔄 [SETUP_REALTIME] Setting up realtime subscription for chat ${chatId}`)
 
@@ -125,42 +127,31 @@ export function useChatMessages(chatId: string, currentUserId?: string) {
             )
             .subscribe((status) => {
                 console.log('🔌 [REALTIME_STATUS]', status)
-                isSubscribedRef.current = status === 'SUBSCRIBED'
+                setIsSubscribed(status === 'SUBSCRIBED')
+                if (status === 'SUBSCRIBED') {
+                    hasSetupRef.current = true
+                    // Load initial messages after subscription is established
+                    loadMessages()
+                }
             })
 
         channelRef.current = channel
-    }, [chatId, currentUserId, upsertMessages])
 
-    const cleanup = useCallback(() => {
-        if (channelRef.current) {
-            console.log('Cleaning up realtime subscription for chat:', chatId)
-            const supabase = createClient()
-            supabase.removeChannel(channelRef.current)
-            channelRef.current = null
-            isSubscribedRef.current = false
+        return () => {
+            if (channelRef.current) {
+                console.log('Cleaning up realtime subscription for chat:', chatId)
+                supabase.removeChannel(channelRef.current)
+                channelRef.current = null
+                setIsSubscribed(false)
+                hasSetupRef.current = false
+            }
         }
-    }, [chatId])
-
-    // Load messages on mount
-    useEffect(() => {
-        loadMessages()
-    }, [loadMessages])
-
-    // Setup realtime subscription
-    useEffect(() => {
-        setupRealtimeSubscription()
-        return cleanup
-    }, [setupRealtimeSubscription, cleanup])
-
-    // Cleanup on unmount
-    useEffect(() => {
-        return cleanup
-    }, [cleanup])
+    }, [chatId, currentUserId, upsertMessages, setIsSubscribed, loadMessages])
 
     return {
         messages,
         upsertMessages,
         loadMessages,
-        isSubscribed: isSubscribedRef.current
+        isSubscribed
     }
 }

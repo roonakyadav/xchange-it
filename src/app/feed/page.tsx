@@ -118,7 +118,7 @@ export default function Feed() {
     const [selectedMode, setSelectedMode] = useState<'selling' | 'requesting'>('selling')
     const [searchTerm, setSearchTerm] = useState('')
     const [activeCategory, setActiveCategory] = useState('All')
-    const [selectedPost, setSelectedPost] = useState<any>(null)
+    const [selectedPost, setSelectedPost] = useState<Post | null>(null)
     const [showEditModal, setShowEditModal] = useState(false)
     const [savedPosts, setSavedPosts] = useState<Set<string>>(new Set())
     const [page, setPage] = useState(1)
@@ -211,7 +211,7 @@ export default function Feed() {
         return postDate.toLocaleDateString()
     }
 
-    const onEditPost = (post: any) => {
+    const onEditPost = (post: Post) => {
         setSelectedPost(post)
         setShowEditModal(true)
     }

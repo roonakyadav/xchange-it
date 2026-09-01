@@ -61,7 +61,7 @@ export default function ChatThread({ chatId }: ChatThreadProps) {
 
     // Auto-scroll to bottom when user sends a message (only if near bottom)
     // Don't auto-scroll for incoming messages to avoid interrupting reading
-    const handleSendMessage = async (e: React.FormEvent) => {
+    const handleSendMessage = async (e: React.SyntheticEvent) => {
         e.preventDefault()
         if (!newMessage.trim() || sending || !user) return
 
@@ -594,7 +594,7 @@ export default function ChatThread({ chatId }: ChatThreadProps) {
                     onClick={handleSendMessage}
                     onTouchStart={(e) => {
                         e.preventDefault()
-                        handleSendMessage(e as any)
+                        handleSendMessage(e)
                     }}
                     disabled={!newMessage.trim() || sending || uploading}
                     className={`px-4 py-3 md:py-2 rounded-full text-white font-medium transition-all touch-manipulation flex-shrink-0 ${newMessage.trim() && !sending && !uploading

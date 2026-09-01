@@ -34,7 +34,7 @@ export default function Profile() {
     const [deletePassword, setDeletePassword] = useState('')
     const [deletingAccount, setDeletingAccount] = useState(false)
     const [showMenu, setShowMenu] = useState(false)
-    const [selectedPost, setSelectedPost] = useState<any>(null)
+    const [selectedPost, setSelectedPost] = useState<PostWithUser | null>(null)
     const [showEditModal, setShowEditModal] = useState(false)
     const menuRef = useRef<HTMLDivElement>(null)
 
@@ -216,7 +216,7 @@ export default function Profile() {
         window.location.href = mailtoLink
     }
 
-    const onEditPost = (post: any) => {
+    const onEditPost = (post: PostWithUser) => {
         setSelectedPost(post)
         setShowEditModal(true)
     }

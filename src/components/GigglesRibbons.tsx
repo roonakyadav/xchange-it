@@ -17,11 +17,15 @@ interface RibbonConfig {
 
 // Custom hook for media queries
 function useMediaQuery(query: string): boolean {
-    const [matches, setMatches] = useState(false)
+    const [matches, setMatches] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return window.matchMedia(query).matches
+        }
+        return false
+    })
 
     useEffect(() => {
         const media = window.matchMedia(query)
-        setMatches(media.matches)
 
         const listener = (event: MediaQueryListEvent) => {
             setMatches(event.matches)
@@ -38,7 +42,7 @@ export default function GigglesRibbons() {
     const containerRef = useRef<HTMLDivElement>(null)
     const ribbonsRef = useRef<HTMLDivElement[]>([])
     const [currentTextIndex, setCurrentTextIndex] = useState(0)
-    const [isClient, setIsClient] = useState(false)
+    const [isClient] = useState(() => typeof window !== 'undefined')
     const isMobile = useMediaQuery('(max-width: 768px)')
 
     // Text variations that rotate
@@ -46,11 +50,6 @@ export default function GigglesRibbons() {
         'BUY • SELL • LOCAL • XCHANGE',
         'CHAT • MARKET • NEARBY • COMMUNITY'
     ]
-
-    // Client-side guard for hydration
-    useEffect(() => {
-        setIsClient(true)
-    }, [])
 
     // Rotate text every 8 seconds
     useEffect(() => {
@@ -60,7 +59,7 @@ export default function GigglesRibbons() {
             setCurrentTextIndex((prev) => (prev + 1) % textVariations.length)
         }, 8000)
         return () => clearInterval(interval)
-    }, [isClient])
+    }, [isClient, setCurrentTextIndex, textVariations.length])
 
     // Generate ribbon configurations with deterministic values
     const generateRibbons = (): RibbonConfig[] => {
