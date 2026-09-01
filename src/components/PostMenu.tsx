@@ -8,8 +8,7 @@ import { useUser } from '@/hooks/useUser'
 interface PostMenuProps {
     postId: string
     imageUrl: string
-    username: string
-    currentUser?: string | null
+    currentUserId?: string | null
     onPostDeleted?: () => void
     onPostEdit?: (post: any) => void
     onPostSaved?: () => void
@@ -17,7 +16,7 @@ interface PostMenuProps {
     post?: any
 }
 
-export default function PostMenu({ postId, imageUrl, username, currentUser, onPostDeleted, onPostEdit, onPostSaved, onPostUnsaved, post }: PostMenuProps) {
+export default function PostMenu({ postId, imageUrl, currentUserId, onPostDeleted, onPostEdit, onPostSaved, onPostUnsaved, post }: PostMenuProps) {
     const [isOpen, setIsOpen] = useState(false)
     const [showReportModal, setShowReportModal] = useState(false)
     const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -95,7 +94,7 @@ export default function PostMenu({ postId, imageUrl, username, currentUser, onPo
 
     const confirmReport = () => {
         const subject = 'Post Report for Review'
-        const body = `Please review this reported post:\nPost URL: ${window.location.origin}/post/${postId}\nReported by: ${currentUser || 'Anonymous'}`
+        const body = `Please review this reported post:\nPost URL: ${window.location.origin}/post/${postId}\nReported by: ${user?.username || 'Anonymous'}`
         const mailtoLink = `mailto:ronakyadav1609@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
         window.location.href = mailtoLink
         setShowReportModal(false)
@@ -124,7 +123,7 @@ export default function PostMenu({ postId, imageUrl, username, currentUser, onPo
         setIsOpen(false)
     }
 
-    const isOwner = currentUser === username
+    const isOwner = currentUserId === post?.user_id
 
     return (
         <div className="relative" ref={menuRef}>

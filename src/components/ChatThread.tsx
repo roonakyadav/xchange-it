@@ -10,7 +10,7 @@ import { formatTimeAgo } from '@/lib/time'
 import { useUser } from '@/hooks/useUser'
 import { useChatMessages } from '@/hooks/useChatMessages'
 import { uploadChatMedia } from '@/lib/chatUtils'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/client'
 import TypingDots from './TypingDots'
 import MediaViewer from './MediaViewer'
 
@@ -27,7 +27,7 @@ export default function ChatThread({ chatId }: ChatThreadProps) {
     const router = useRouter()
     const searchParams = useSearchParams()
     const { user } = useUser()
-    const { messages, upsertMessages } = useChatMessages(chatId, user?.username)
+    const { messages, upsertMessages } = useChatMessages(chatId, user?.id)
     const [chat, setChat] = useState<ChatWithPost | null>(null)
     const [newMessage, setNewMessage] = useState('')
     const [loading, setLoading] = useState(true)
@@ -72,7 +72,7 @@ export default function ChatThread({ chatId }: ChatThreadProps) {
         try {
             await sendMessage({
                 chatId,
-                sender: user.username,
+                senderId: user.id,
                 body: messageText,
             })
 
@@ -92,7 +92,7 @@ export default function ChatThread({ chatId }: ChatThreadProps) {
             setIsTyping(false)
             messageChannelsRef.current.forEach(channel => {
                 if (channel.topic?.includes('presence-typing')) {
-                    updateTypingStatus(channel, false, user.username)
+                    updateTypingStatus(channel, false, user.id)
                 }
             })
 
@@ -169,7 +169,7 @@ export default function ChatThread({ chatId }: ChatThreadProps) {
         loadChat()
 
         // Mark thread as read on open
-        markThreadRead(chatId, user.username).catch(console.error)
+        markThreadRead(chatId, user.id).catch(console.error)
     }, [chatId, user, router])
 
     // Mark unread messages as read when window becomes visible (debounced)
@@ -180,7 +180,7 @@ export default function ChatThread({ chatId }: ChatThreadProps) {
             if (!document.hidden && user) {
                 clearTimeout(timeoutId)
                 timeoutId = setTimeout(() => {
-                    markThreadRead(chatId, user.username).catch(console.error)
+                    markThreadRead(chatId, user.id).catch(console.error)
                 }, 300)
             }
         }
@@ -197,12 +197,12 @@ export default function ChatThread({ chatId }: ChatThreadProps) {
         if (!user || !chat) return
 
         console.log('Setting up typing subscriptions for chat:', chatId)
-        const otherUser = chat.user1 === user.username ? chat.user2 : chat.user1
+        const otherUserId = chat.user1_id === user.id ? chat.user2_id : chat.user1_id
 
         // Subscribe to typing indicators
-        const typingChannel = subscribeToTyping(chatId, user.username, (state) => {
+        const typingChannel = subscribeToTyping(chatId, user.id, (state) => {
             const otherUserTyping = Object.values(state).some(users =>
-                users.some(u => u.user === otherUser && u.typing)
+                users.some(u => u.user === otherUserId && u.typing)
             )
             setOtherUserTyping(otherUserTyping)
         })
@@ -239,7 +239,7 @@ export default function ChatThread({ chatId }: ChatThreadProps) {
             setIsTyping(true)
             messageChannelsRef.current.forEach(channel => {
                 if (channel.topic?.includes('presence-typing')) {
-                    updateTypingStatus(channel, true, user!.username)
+                    updateTypingStatus(channel, true, user!.id)
                 }
             })
         }
@@ -254,7 +254,7 @@ export default function ChatThread({ chatId }: ChatThreadProps) {
             setIsTyping(false)
             messageChannelsRef.current.forEach(channel => {
                 if (channel.topic?.includes('presence-typing')) {
-                    updateTypingStatus(channel, false, user!.username)
+                    updateTypingStatus(channel, false, user!.id)
                 }
             })
         }, 1500)
@@ -289,13 +289,14 @@ export default function ChatThread({ chatId }: ChatThreadProps) {
         setUploadProgress(0)
 
         try {
-            const otherUser = chat.user1 === user.username ? chat.user2 : chat.user1
-            const mediaUrl = await uploadChatMedia(file, user.username, otherUser, setUploadProgress)
+            const supabase = createClient()
+            const otherUserId = chat.user1_id === user.id ? chat.user2_id : chat.user1_id
+            const mediaUrl = await uploadChatMedia(file, user.id, otherUserId, setUploadProgress)
 
             // Send media message
             await supabase.from('messages').insert([{
                 chat_id: chatId,
-                sender: user.username,
+                sender_id: user.id,
                 body: `[MEDIA]${mediaUrl}`,
             }])
 
@@ -358,7 +359,7 @@ export default function ChatThread({ chatId }: ChatThreadProps) {
 
     if (!chat || !user) return null
 
-    const otherUser = chat.user1 === user.username ? chat.user2 : chat.user1
+    const otherUser = chat.user1_id === user.id ? chat.user2 : chat.user1
 
     return (
         <div className="flex flex-col h-screen bg-black overflow-hidden">
@@ -368,18 +369,26 @@ export default function ChatThread({ chatId }: ChatThreadProps) {
                     <div className="flex items-center space-x-3 md:space-x-4 flex-1 min-w-0">
                         {/* Avatar */}
                         <div className="relative flex-shrink-0">
-                            <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center shadow-lg">
-                                <span className="text-white font-bold text-base md:text-lg">
-                                    {otherUser.charAt(0).toUpperCase()}
-                                </span>
-                            </div>
+                            {otherUser?.avatar_url ? (
+                                <img
+                                    src={otherUser.avatar_url}
+                                    alt={otherUser.username}
+                                    className="w-10 h-10 md:w-12 md:h-12 rounded-full object-cover shadow-lg"
+                                />
+                            ) : (
+                                <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center shadow-lg">
+                                    <span className="text-white font-bold text-base md:text-lg">
+                                        {otherUser?.username?.charAt(0).toUpperCase() || '?'}
+                                    </span>
+                                </div>
+                            )}
                             {/* Online indicator */}
                             <div className="absolute -bottom-1 -right-1 w-3 h-3 md:w-4 md:h-4 bg-green-500 rounded-full border-2 border-black"></div>
                         </div>
 
                         {/* User Info - Ensure name is always visible */}
                         <div className="min-w-0 flex-1">
-                            <h2 className="font-semibold text-white text-base md:text-lg truncate">@{otherUser}</h2>
+                            <h2 className="font-semibold text-white text-base md:text-lg truncate">@{otherUser?.username || 'Unknown'}</h2>
                             {otherUserTyping ? (
                                 <div className="flex items-center space-x-1">
                                     <TypingDots />
@@ -421,7 +430,7 @@ export default function ChatThread({ chatId }: ChatThreadProps) {
                 {/* Messages */}
                 <AnimatePresence>
                     {messages.map((message) => {
-                        const isMine = message.sender === user.username
+                        const isMine = message.sender_id === user.id
 
                         return (
                             <motion.div
@@ -500,7 +509,7 @@ export default function ChatThread({ chatId }: ChatThreadProps) {
                                 </svg>
                             </div>
                             <h3 className="text-lg font-semibold text-white mb-2">Start a conversation</h3>
-                            <p className="text-gray-400">Send a message to @{otherUser}</p>
+                            <p className="text-gray-400">Send a message to @{otherUser?.username || 'Unknown'}</p>
                         </div>
                     </motion.div>
                 )}

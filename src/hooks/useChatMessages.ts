@@ -1,10 +1,10 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/client'
 import { getChatMessages, markThreadRead } from '@/lib/db'
 import type { Message } from '@/types'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
-export function useChatMessages(chatId: string, currentUser?: string) {
+export function useChatMessages(chatId: string, currentUserId?: string) {
     const [byId, setById] = useState<Record<string, Message>>({})
     const [order, setOrder] = useState<string[]>([])
     const channelRef = useRef<RealtimeChannel | null>(null)
@@ -56,10 +56,11 @@ export function useChatMessages(chatId: string, currentUser?: string) {
     }, [chatId, upsertMessages])
 
     const setupRealtimeSubscription = useCallback(() => {
-        if (!chatId || !currentUser || isSubscribedRef.current) return
+        if (!chatId || !currentUserId || isSubscribedRef.current) return
 
         console.log(`🔄 [SETUP_REALTIME] Setting up realtime subscription for chat ${chatId}`)
 
+        const supabase = createClient()
         // Clean up existing subscription
         if (channelRef.current) {
             supabase.removeChannel(channelRef.current)
@@ -89,10 +90,10 @@ export function useChatMessages(chatId: string, currentUser?: string) {
                     upsertMessages(msg)
 
                     // Auto-mark read if from other user and page visible
-                    if (msg.sender !== currentUser && document.visibilityState === 'visible') {
+                    if (msg.sender_id !== currentUserId && document.visibilityState === 'visible') {
                         console.log('🔖 [MESSAGE_INSERT] Auto-marking thread as read')
                         try {
-                            await markThreadRead(chatId, currentUser)
+                            await markThreadRead(chatId, currentUserId)
                         } catch (error) {
                             console.error('❌ [MESSAGE_INSERT] Failed to mark thread read:', error)
                         }
@@ -128,11 +129,12 @@ export function useChatMessages(chatId: string, currentUser?: string) {
             })
 
         channelRef.current = channel
-    }, [chatId, currentUser, upsertMessages])
+    }, [chatId, currentUserId, upsertMessages])
 
     const cleanup = useCallback(() => {
         if (channelRef.current) {
             console.log('Cleaning up realtime subscription for chat:', chatId)
+            const supabase = createClient()
             supabase.removeChannel(channelRef.current)
             channelRef.current = null
             isSubscribedRef.current = false

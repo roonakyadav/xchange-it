@@ -6,14 +6,11 @@ import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import toast from 'react-hot-toast'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/client'
 import { signupSchema, type SignupInput } from '@/lib/validators'
-import { insertUser, isUsernameTaken } from '@/lib/db'
-import { useUser } from '@/hooks/useUser'
 
 export default function Signup() {
     const router = useRouter()
-    const { login } = useUser()
     const [loading, setLoading] = useState(false)
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
@@ -56,14 +53,7 @@ export default function Signup() {
         setLoading(true)
 
         try {
-            // Check if username is taken
-            const taken = await isUsernameTaken(data.username)
-            if (taken) {
-                toast.error('Username already taken')
-                setLoading(false)
-                return
-            }
-
+            const supabase = createClient()
             let avatarUrl: string | undefined
 
             // Upload avatar if provided
@@ -85,16 +75,35 @@ export default function Signup() {
                 avatarUrl = publicUrl
             }
 
-            // Create user
-            await insertUser({
-                name: data.name,
-                username: data.username,
+            // Sign up with Supabase Auth
+            const { data: authData, error: authError } = await supabase.auth.signUp({
+                email: data.email,
                 password: data.password,
-                avatar_url: avatarUrl
+                options: {
+                    data: {
+                        name: data.name,
+                        username: data.username,
+                        avatar_url: avatarUrl
+                    }
+                }
             })
 
-            // Login user and redirect
-            login(data.username)
+            if (authError) {
+                if (authError.message.includes('User already registered')) {
+                    toast.error('An account with this email already exists')
+                } else {
+                    toast.error(authError.message)
+                }
+                setLoading(false)
+                return
+            }
+
+            if (!authData.user) {
+                toast.error('Failed to create account')
+                setLoading(false)
+                return
+            }
+
             toast.success('Account created successfully!')
             router.push('/feed')
 
@@ -157,11 +166,29 @@ export default function Signup() {
                         />
                     </motion.div>
 
-                    {/* Name */}
+                    {/* Email */}
                     <motion.div
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: 0.2 }}
+                    >
+                        <label className="block text-sm font-medium mb-2">Email</label>
+                        <input
+                            {...register('email')}
+                            type="email"
+                            className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-2xl focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-colors text-white placeholder-gray-400"
+                            placeholder="your@email.com"
+                        />
+                        {errors.email && (
+                            <p className="text-red-500 text-sm mt-1">{errors.email.message}</p>
+                        )}
+                    </motion.div>
+
+                    {/* Name */}
+                    <motion.div
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.25 }}
                     >
                         <label className="block text-sm font-medium mb-2">Name</label>
                         <input

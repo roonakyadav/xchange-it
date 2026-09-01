@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { isUserBlocked } from '@/lib/db'
 import { useUser } from '@/hooks/useUser'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
 
 interface ChatMenuProps {
@@ -32,6 +32,7 @@ export default function ChatMenu({ chatId, otherUser }: ChatMenuProps) {
 
         setLoading(true)
         try {
+            const supabase = createClient()
             if (isBlocked) {
                 await supabase.from('blocked_users')
                     .delete()

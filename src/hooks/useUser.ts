@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { getUser } from '@/lib/db'
+import { createClient } from '@/lib/supabase/client'
 import type { User } from '@/types'
 
 export function useUser() {
@@ -11,47 +11,64 @@ export function useUser() {
     const router = useRouter()
 
     useEffect(() => {
+        // Get initial session
         const initializeUser = async () => {
-            const username = localStorage.getItem('x_user')
-
-            if (!username) {
-                setLoading(false)
-                return
-            }
-
             try {
-                // Verify user exists in database
-                const userData = await getUser(username)
-                if (!userData) {
-                    // User doesn't exist, clear localStorage and redirect
-                    localStorage.removeItem('x_user')
-                    localStorage.removeItem('x_seen_welcome')
-                    setLoading(false)
-                    return
-                }
+                const supabase = createClient()
+                const { data: { session } } = await supabase.auth.getSession()
+                
+                if (session?.user) {
+                    // Fetch user profile from public.users
+                    const { data: profile, error } = await supabase
+                        .from('users')
+                        .select('*')
+                        .eq('id', session.user.id)
+                        .single()
 
-                setUser(userData)
+                    if (error) {
+                        console.error('Error fetching user profile:', error)
+                    } else if (profile) {
+                        setUser(profile)
+                    }
+                }
             } catch (error) {
-                console.error('Error verifying user:', error)
-                // On error, clear localStorage to be safe
-                localStorage.removeItem('x_user')
-                localStorage.removeItem('x_seen_welcome')
+                console.error('Error initializing user:', error)
             } finally {
                 setLoading(false)
             }
         }
 
         initializeUser()
+
+        // Listen for auth changes
+        const supabase = createClient()
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+            if (session?.user) {
+                // Fetch user profile from public.users
+                const { data: profile, error } = await supabase
+                    .from('users')
+                    .select('*')
+                    .eq('id', session.user.id)
+                    .single()
+
+                if (error) {
+                    console.error('Error fetching user profile:', error)
+                    setUser(null)
+                } else if (profile) {
+                    setUser(profile)
+                }
+            } else {
+                setUser(null)
+            }
+            setLoading(false)
+        })
+
+        return () => subscription.unsubscribe()
     }, [])
 
-    const login = (username: string) => {
-        localStorage.setItem('x_user', username)
-        // Note: We don't set user state here as the useEffect will handle verification
-    }
-
-    const logout = () => {
-        localStorage.removeItem('x_user')
-        localStorage.removeItem('x_seen_welcome')
+    const logout = async () => {
+        const supabase = createClient()
+        await supabase.auth.signOut()
         setUser(null)
         router.push('/auth')
     }
@@ -59,7 +76,6 @@ export function useUser() {
     return {
         user,
         loading,
-        login,
         logout,
         isAuthenticated: !!user
     }

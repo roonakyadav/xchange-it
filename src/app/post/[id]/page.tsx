@@ -6,30 +6,34 @@ import { useRouter, useParams } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/hooks/useUser'
 import { getOrCreateChat } from '@/lib/db'
 
 interface Post {
     id: string
+    user_id: string
     title: string
     description: string
     image_url: string
-    username: string
     mode: 'selling' | 'requesting'
     price: string
     tags: string[]
     created_at: string
     users: {
+        id: string
         username: string
         name: string
+        avatar_url?: string
     } | null
 }
 
 interface PostWithUser extends Omit<Post, 'users'> {
     users: {
+        id: string
         username: string
         name: string
+        avatar_url?: string
     } | null
 }
 
@@ -50,21 +54,24 @@ export default function PostDetail() {
 
     const fetchPost = async (postId: string) => {
         try {
+            const supabase = createClient()
             const { data, error } = await supabase
                 .from('posts')
                 .select(`
           id,
+          user_id,
           title,
           description,
           image_url,
-          username,
           mode,
           price,
           tags,
           created_at,
           users (
+            id,
             username,
-            name
+            name,
+            avatar_url
           )
         `)
                 .eq('id', postId)
@@ -108,13 +115,13 @@ export default function PostDetail() {
         }
 
         // Check if post has user data
-        if (!post.users?.username) {
+        if (!post.users?.id) {
             toast.error('Post author information not available')
             return
         }
 
         // Don't allow messaging yourself
-        if (post.users.username === user.username) {
+        if (post.users.id === user.id) {
             toast.error('You cannot message yourself')
             return
         }
@@ -122,8 +129,8 @@ export default function PostDetail() {
         try {
             // Get or create chat
             const chat = await getOrCreateChat({
-                user1: user.username,
-                user2: post.users.username,
+                user1_id: user.id,
+                user2_id: post.users.id,
                 postId: post.id,
             })
 
@@ -166,7 +173,7 @@ export default function PostDetail() {
 
     if (!post) return null
 
-    const isOwnPost = post.users?.username === user?.username
+    const isOwnPost = post.users?.id === user?.id
 
     return (
         <div className="min-h-screen bg-black">

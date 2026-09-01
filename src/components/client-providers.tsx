@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { Toaster } from 'react-hot-toast'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/client'
 
 export default function ClientProviders({
     children,
@@ -10,10 +10,12 @@ export default function ClientProviders({
     children: React.ReactNode
 }) {
     useEffect(() => {
+        // Supabase Auth handles session management automatically
+        // No need to manually store tokens in localStorage
+        const supabase = createClient()
         const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-            if (session) {
-                localStorage.setItem('sb-auth-token', session.access_token)
-            }
+            // Session changes are handled by the useUser hook
+            // This listener is kept for any future side effects
         })
 
         return () => listener.subscription.unsubscribe()

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
 
 interface EditPostModalProps {
@@ -25,6 +25,7 @@ export default function EditPostModal({ post, onClose, onUpdate }: EditPostModal
     const handleSubmit = async () => {
         setLoading(true)
         try {
+            const supabase = createClient()
             console.log('🔄 [EDIT_POST] Starting update for post:', post.id)
             console.log('📝 [EDIT_POST] Form data:', formData)
             console.log('👤 [EDIT_POST] Post owner:', post.username)

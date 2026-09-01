@@ -1,4 +1,13 @@
-import { supabase } from './supabase'
+import { createClient } from './supabase/client'
+
+let supabase: ReturnType<typeof createClient> | null = null
+
+function getClient() {
+  if (!supabase) {
+    supabase = createClient()
+  }
+  return supabase
+}
 
 export async function uploadChatMedia(
     file: File,
@@ -6,10 +15,10 @@ export async function uploadChatMedia(
     receiverId: string,
     setProgress: (progress: number) => void
 ): Promise<string> {
-    // Check app authentication (not Supabase auth since app uses custom auth)
-    const username = localStorage.getItem('x_user')
+    // Check Supabase authentication
+    const { data: { session } } = await getClient().auth.getSession()
 
-    if (!username) {
+    if (!session) {
         console.warn('User not authenticated. Upload aborted.')
         alert('Please log in before uploading media.')
         throw new Error('User not authenticated')
@@ -22,7 +31,7 @@ export async function uploadChatMedia(
     setProgress(0)
 
     // Try upload with RLS bypass for public bucket
-    const { data, error } = await supabase.storage
+    const { data, error } = await getClient().storage
         .from('chat_media')
         .upload(filePath, file, {
             cacheControl: '3600',
@@ -46,7 +55,7 @@ export async function uploadChatMedia(
     // In a real implementation, you might need to use XMLHttpRequest or fetch with progress tracking
     setProgress(100)
 
-    const { data: publicUrl } = supabase.storage
+    const { data: publicUrl } = getClient().storage
         .from('chat_media')
         .getPublicUrl(filePath)
 

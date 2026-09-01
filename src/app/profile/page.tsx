@@ -10,7 +10,7 @@ import { MoreVertical, Heart, Grid3X3, Settings, MessageSquare, Star } from 'luc
 import BottomNav from '@/components/BottomNav'
 import PostMenu from '@/components/PostMenu'
 import EditPostModal from '@/components/EditPostModal'
-import { getUser, updateUsernameEverywhere, getUserPosts, deletePostAndImage, deleteAccount, authenticateUser, getSavedPosts, getUserStats, updateUserProfile, submitFeedback } from '@/lib/db'
+import { getUserByUsername, getUserPosts, deletePostAndImage, deleteAccount, getSavedPosts, getUserStats, updateUserProfile, submitFeedback } from '@/lib/db'
 import { profileSchema, feedbackSchema, type ProfileInput } from '@/lib/validators'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -58,7 +58,7 @@ export default function Profile() {
             return
         }
 
-        fetchUserPosts(currentUser.username)
+        fetchUserPosts(currentUser.id)
         fetchSavedPosts()
     }, [router, currentUser, userLoading])
 
@@ -87,10 +87,10 @@ export default function Profile() {
         return null
     }
 
-    const fetchUserPosts = async (username: string) => {
+    const fetchUserPosts = async (userId: string) => {
         try {
             // Fetch user's posts
-            const userPosts = await getUserPosts(username)
+            const userPosts = await getUserPosts(userId)
             setPosts(userPosts)
 
             reset({
@@ -124,24 +124,21 @@ export default function Profile() {
         setSaving(true)
 
         try {
-            // If username changed, update everywhere
-            if (data.username !== currentUser.username) {
-                await updateUsernameEverywhere(currentUser.username, data.username)
-            }
-
             // Update user info
-            const { supabase } = await import('@/lib/supabase')
+            const { createClient } = await import('@/lib/supabase/client')
+            const supabase = createClient()
             const { error } = await supabase
                 .from('users')
                 .update({
                     name: data.name,
-                    username: data.username
+                    username: data.username,
+                    bio: data.bio,
+                    portfolio: data.portfolio
                 })
                 .eq('id', currentUser.id)
 
             if (error) throw error
 
-            // The useUser hook will handle the localStorage update
             setEditing(false)
             toast.success('Profile updated successfully!')
 
@@ -165,16 +162,29 @@ export default function Profile() {
         setDeletingAccount(true)
 
         try {
-            // Verify password
-            const { user, error } = await authenticateUser(currentUser.username, deletePassword)
+            // Verify password by attempting to sign in
+            const { createClient } = await import('@/lib/supabase/client')
+            const supabase = createClient()
+            const { data: { session } } = await supabase.auth.getSession()
+            
+            if (!session?.user?.email) {
+                toast.error('Unable to verify identity')
+                setDeletingAccount(false)
+                return
+            }
 
-            if (error === 'wrong_password') {
+            const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+                email: session.user.email,
+                password: deletePassword
+            })
+
+            if (signInError) {
                 toast.error('Wrong password')
                 setDeletingAccount(false)
                 return
             }
 
-            if (!user) {
+            if (!signInData.user) {
                 toast.error('Authentication failed')
                 setDeletingAccount(false)
                 return
@@ -183,8 +193,10 @@ export default function Profile() {
             // Delete account using user ID
             await deleteAccount(currentUser.id)
 
-            // Clear localStorage
-            localStorage.removeItem('x_user')
+            // Sign out
+            await supabase.auth.signOut()
+
+            // Clear welcome flag
             localStorage.removeItem('x_seen_welcome')
 
             // Show success toast and redirect
@@ -430,9 +442,8 @@ export default function Profile() {
                                                 <PostMenu
                                                     postId={post.id}
                                                     imageUrl={post.image_url}
-                                                    username={post.username}
-                                                    currentUser={currentUser?.username}
-                                                    onPostDeleted={() => fetchUserPosts(currentUser!.username)}
+                                                    currentUserId={currentUser?.id}
+                                                    onPostDeleted={() => fetchUserPosts(currentUser!.id)}
                                                     onPostEdit={onEditPost}
                                                     onPostSaved={() => fetchSavedPosts()}
                                                     onPostUnsaved={() => fetchSavedPosts()}

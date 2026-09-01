@@ -10,7 +10,7 @@ import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import toast from 'react-hot-toast'
 import { Camera } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/client'
 import { type PostInputRaw } from '@/lib/validators'
 import { useUser } from '@/hooks/useUser'
 
@@ -237,6 +237,7 @@ export default function NewPost() {
         setUploadProgress(0)
 
         try {
+            const supabase = createClient()
             // Upload image to Supabase storage
             const fileExt = rawData.image.name.split('.').pop()
             const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
@@ -292,7 +293,7 @@ export default function NewPost() {
                 title: rawData.title,
                 description: rawData.description,
                 image_url: publicUrl,
-                username: user.username,
+                user_id: user.id,
                 mode: rawData.mode,
                 price: numericPrice,
                 tags: tags,

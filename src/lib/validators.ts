@@ -8,6 +8,11 @@ export const usernameSchema = z
     .regex(/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers, and underscores')
 
 export const signupSchema = z.object({
+    email: z
+        .string()
+        .min(1, 'Email is required')
+        .email('Invalid email address')
+        .trim(),
     name: z
         .string()
         .min(1, 'Name is required')
@@ -22,7 +27,11 @@ export const signupSchema = z.object({
 })
 
 export const signinSchema = z.object({
-    username: usernameSchema,
+    email: z
+        .string()
+        .min(1, 'Email is required')
+        .email('Invalid email address')
+        .trim(),
     password: z
         .string()
         .min(1, 'Password is required'),

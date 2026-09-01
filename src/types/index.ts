@@ -5,31 +5,33 @@ export interface User {
     name: string
     username: string
     avatar_url?: string
-    password_hash: string
+    bio?: string
+    portfolio?: string
     created_at: string
 }
 
 export interface Post {
     id: string
+    user_id: string
     title: string
     description: string
     image_url: string
-    username: string
     mode: PostMode
     price: string
+    category?: string
     tags: string[]
     created_at: string
 }
 
 export interface Chat {
     id: string
-    user1: string
-    user2: string
+    user1_id: string
+    user2_id: string
     post_id?: string
     created_at: string
     updated_at?: string
     last_message?: string
-    last_sender?: string
+    last_sender_id?: string
     unread_user1?: number
     unread_user2?: number
     deleted_by_user1?: boolean
@@ -39,7 +41,7 @@ export interface Chat {
 export interface Message {
     id: string
     chat_id: string
-    sender: string
+    sender_id: string
     body: string
     type?: 'text' | 'media'
     created_at: string
@@ -51,7 +53,11 @@ export interface Message {
 }
 
 export interface PostWithUser extends Post {
-    users: User | null
+    users?: {
+        username: string
+        name: string
+        avatar_url?: string
+    } | null
 }
 
 export interface ChatWithPost extends Chat {
@@ -59,6 +65,18 @@ export interface ChatWithPost extends Chat {
         title: string
         image_url: string
     } | null
+    user1?: {
+        id: string
+        username: string
+        name: string
+        avatar_url?: string
+    }
+    user2?: {
+        id: string
+        username: string
+        name: string
+        avatar_url?: string
+    }
 }
 
 export interface ChatWithMessages extends Chat {
@@ -88,4 +106,21 @@ export interface UserStats {
     totalComments: number
     joinDate: string
     lastActive: string
+}
+
+export interface ChatPreview {
+    id: string
+    user1_id: string
+    user2_id: string
+    post_id?: string
+    created_at: string
+    updated_at?: string
+    posts?: {
+        title: string
+        image_url: string
+    } | null
+    lastMessage?: Message
+    unreadCount: number
+    outgoingPendingCount: number
+    otherUser: string
 }

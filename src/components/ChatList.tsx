@@ -8,7 +8,7 @@ import { getVisibleChats, computePreview, isUserBlocked } from '@/lib/db'
 import { subscribeToChatUpdates } from '@/lib/realtime'
 import { formatTimeAgo } from '@/lib/time'
 import { useUser } from '@/hooks/useUser'
-import type { ChatPreview } from '@/lib/db'
+import type { ChatPreview } from '@/types'
 
 interface ChatListProps {
     onChatSelect?: (chatId: string) => void
@@ -92,8 +92,8 @@ export default function ChatList({ onChatSelect, selectedChatId, searchQuery }: 
             return `**${unreadCount} unread message${unreadCount > 1 ? 's' : ''}**`
         }
 
-        // Priority 2: else if last.sender != me → last.body (1-line truncate)
-        if (lastMessage && lastMessage.sender !== user?.username) {
+        // Priority 2: else if last.sender_id != me → last.body (1-line truncate)
+        if (lastMessage && lastMessage.sender_id !== user?.id) {
             return lastMessage.body.length > 50
                 ? lastMessage.body.substring(0, 50) + '...'
                 : lastMessage.body

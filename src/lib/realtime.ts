@@ -1,6 +1,15 @@
-import { supabase } from './supabase'
+import { createClient } from './supabase/client'
 import type { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import type { Message } from '@/types'
+
+let supabase: ReturnType<typeof createClient> | null = null
+
+function getClient() {
+  if (!supabase) {
+    supabase = createClient()
+  }
+  return supabase
+}
 
 export interface TypingUser {
     user: string
@@ -15,11 +24,11 @@ export interface PresenceState {
 export function subscribeToMessages(
     chatId: string,
     onMessage: (message: Message, eventType: 'INSERT' | 'UPDATE') => void,
-    currentUser?: string
+    currentUserId?: string
 ): RealtimeChannel {
     console.log(`Setting up realtime subscription for chat ${chatId}`)
 
-    const channel = supabase
+    const channel = getClient()
         .channel(`messages-${chatId}`)
         .on(
             'postgres_changes',
@@ -36,10 +45,10 @@ export function subscribeToMessages(
                     console.log('New message:', message)
 
                     // If we have a current user, check if sender is blocked
-                    if (currentUser && message.sender !== currentUser) {
+                    if (currentUserId && message.sender_id !== currentUserId) {
                         try {
                             const { isUserBlocked } = await import('./db')
-                            const blocked = await isUserBlocked(currentUser, message.sender)
+                            const blocked = await isUserBlocked(currentUserId, message.sender_id)
                             if (blocked) {
                                 console.log('Ignoring message from blocked user')
                                 // Ignore messages from blocked users
@@ -82,13 +91,13 @@ export function subscribeToMessages(
 // Typing indicator with presence
 export function subscribeToTyping(
     chatId: string,
-    currentUser: string,
+    currentUserId: string,
     onPresenceUpdate: (state: PresenceState) => void
 ): RealtimeChannel {
-    const channel = supabase.channel(`presence-typing-${chatId}`, {
+    const channel = getClient().channel(`presence-typing-${chatId}`, {
         config: {
             presence: {
-                key: currentUser,
+                key: currentUserId,
             },
         },
     })
@@ -113,23 +122,23 @@ export function subscribeToTyping(
 export function updateTypingStatus(
     channel: RealtimeChannel,
     isTyping: boolean,
-    username: string
+    userId: string
 ): void {
     channel.track({
-        user: username,
+        user: userId,
         typing: isTyping,
     })
 }
 
 // Chat updates subscription (for unread counters, last message, new chats, re-activation)
 export function subscribeToChatUpdates(
-    username: string,
+    userId: string,
     onChatUpdate: () => void
 ): RealtimeChannel {
-    console.log(`🔄 [CHAT_SUBSCRIBE] Setting up chat updates for user: ${username}`)
+    console.log(`🔄 [CHAT_SUBSCRIBE] Setting up chat updates for user: ${userId}`)
 
-    const channel = supabase
-        .channel(`chats-${username}`)
+    const channel = getClient()
+        .channel(`chats-${userId}`)
         // Listen for new chats involving this user
         .on(
             'postgres_changes',
@@ -137,7 +146,7 @@ export function subscribeToChatUpdates(
                 event: 'INSERT',
                 schema: 'public',
                 table: 'chats',
-                filter: `user1=eq.${username}`,
+                filter: `user1_id=eq.${userId}`,
             },
             (payload) => {
                 console.log('🆕 [CHAT_INSERT] New chat for user1:', payload.new?.id)
@@ -150,7 +159,7 @@ export function subscribeToChatUpdates(
                 event: 'INSERT',
                 schema: 'public',
                 table: 'chats',
-                filter: `user2=eq.${username}`,
+                filter: `user2_id=eq.${userId}`,
             },
             (payload) => {
                 console.log('🆕 [CHAT_INSERT] New chat for user2:', payload.new?.id)
@@ -164,7 +173,7 @@ export function subscribeToChatUpdates(
                 event: 'UPDATE',
                 schema: 'public',
                 table: 'chats',
-                filter: `user1=eq.${username}`,
+                filter: `user1_id=eq.${userId}`,
             },
             (payload) => {
                 console.log('🔄 [CHAT_UPDATE] Chat update for user1:', payload.new?.id, {
@@ -183,7 +192,7 @@ export function subscribeToChatUpdates(
                 event: 'UPDATE',
                 schema: 'public',
                 table: 'chats',
-                filter: `user2=eq.${username}`,
+                filter: `user2_id=eq.${userId}`,
             },
             (payload) => {
                 console.log('🔄 [CHAT_UPDATE] Chat update for user2:', payload.new?.id, {

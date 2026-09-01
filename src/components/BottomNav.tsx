@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react'
 import { getChatPreviews } from '@/lib/db'
 import { subscribeToChatUpdates } from '@/lib/realtime'
 import { useUser } from '@/hooks/useUser'
-import type { ChatPreview } from '@/lib/db'
+import type { ChatPreview } from '@/types'
 
 export default function BottomNav() {
     const pathname = usePathname()

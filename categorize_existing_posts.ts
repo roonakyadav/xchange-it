@@ -8,13 +8,13 @@ config({ path: '.env.local' })
 
 // Create Supabase client with loaded environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 const geminiKey = process.env.GEMINI_API_KEY
 
 if (!supabaseUrl || !supabaseKey) {
     console.error('❌ Missing Supabase environment variables')
     console.error('NEXT_PUBLIC_SUPABASE_URL:', !!supabaseUrl)
-    console.error('NEXT_PUBLIC_SUPABASE_ANON_KEY:', !!supabaseKey)
+    console.error('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:', !!supabaseKey)
     process.exit(1)
 }
 

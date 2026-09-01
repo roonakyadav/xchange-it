@@ -117,7 +117,7 @@ export default function NavDesktop() {
 
         const checkUnread = async () => {
             try {
-                const chats = await getChatPreviews(user.username)
+                const chats = await getChatPreviews(user.id)
                 const totalUnread = chats.reduce((total, chat) => total + chat.unreadCount, 0)
                 setHasUnread(totalUnread > 0)
             } catch (error) {
@@ -128,7 +128,7 @@ export default function NavDesktop() {
         checkUnread()
 
         // Subscribe to realtime updates
-        const chatChannel = subscribeToChatUpdates(user.username, checkUnread)
+        const chatChannel = subscribeToChatUpdates(user.id, checkUnread)
 
         return () => {
             chatChannel.unsubscribe()
