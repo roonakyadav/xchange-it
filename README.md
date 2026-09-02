@@ -1,310 +1,400 @@
 # Xchange
 
-A digital marketplace application with real-time chat, AI-powered categorization, and Supabase backend.
+A peer-to-peer marketplace for digital products with real-time communication and AI-assisted listing creation.
 
-## Overview
+Xchange lets users discover, list, and exchange digital goods — subscriptions, templates, coupon codes, art, and more. Built with Next.js 16, Supabase, and Google Gemini for intelligent categorization and description generation.
 
-Xchange is a marketplace for buying and selling digital goods (subscriptions, templates, coupons, art, etc.). Users can create posts with images, chat in real-time, and manage their profiles. The application uses Supabase for authentication, database, storage, and realtime features.
+![Next.js](https://img.shields.io/badge/Next.js-16.0-black?style=flat&logo=next.js)
+![React](https://img.shields.io/badge/React-19.2-black?style=flat&logo=react)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-black?style=flat&logo=typescript)
+![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-black?style=flat&logo=supabase)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-black?style=flat&logo=tailwindcss)
+![Google Gemini](https://img.shields.io/badge/Gemini-AI-black?style=flat&logo=google)
 
-## Core Features
+---
 
-- **Marketplace**: Create posts with images, categorize items, set prices
-- **Real-time Chat**: Instant messaging between buyers and sellers with typing indicators
-- **AI Integration**: Google Gemini for automatic post categorization and description generation
-- **Authentication**: Supabase Auth with email/password signup and signin
-- **Profile Management**: User profiles with avatars, post history, and account deletion
-- **Saved Posts**: Bookmark posts for later viewing
-- **User Blocking**: Block other users to prevent unwanted interactions
-- **Feedback System**: Submit feedback about the application
+## What Xchange Does
+
+Users create listings with images, set prices, and categorize items as either "selling" or "requesting." The marketplace supports real-time chat between buyers and sellers, with typing indicators and read receipts. AI automatically categorizes posts and generates descriptions from uploaded images.
+
+**Who it's for:** Anyone buying or selling digital products — streaming subscriptions, design templates, discount codes, digital art, or other virtual goods.
+
+**What makes it different:** Real-time messaging built directly into the marketplace, AI-assisted listing creation, and a clean mobile-first interface.
+
+---
+
+## Features
+
+### Marketplace Listings
+
+Create posts with images, titles, descriptions, prices, and tags. Toggle between "selling" and "requesting" modes. Listings are publicly visible and sorted chronologically.
+
+### Real-Time Chat
+
+Instant messaging between buyers and sellers. Chat threads subscribe to Supabase Realtime updates so new messages appear without polling. Typing indicators show when the other participant is composing a message.
+
+### AI-Powered Categorization
+
+Google Gemini analyzes post titles, descriptions, and images to automatically classify items into categories: Subscription, Templates, Coupon Code, Art, or Others. Falls back to keyword-based classification if the API is unavailable.
+
+### AI Description Generation
+
+Upload an image and let Gemini generate a compelling product description. Supports both selling and requesting modes with context-aware prompts. Falls back to keyword-based templates if AI fails.
+
+### Authentication & Profiles
+
+Supabase Auth handles email/password signup and signin. User profiles include avatars, usernames, bios, and portfolio links. Account deletion cascades to all user data for privacy.
+
+### Saved Posts
+
+Bookmark posts for later viewing. Saved posts are private to each user and persist across sessions.
+
+### User Blocking
+
+Block other users to prevent unwanted interactions. Blocked users' messages are filtered from realtime subscriptions.
+
+### Soft-Delete Chats
+
+Chats support soft deletion — when a user deletes a conversation, it's only hidden for them. The other participant can still access the thread.
+
+---
+
+## Technical Highlights
+
+**Next.js 16 App Router** — Server-side rendering with React Server Components and streaming. Auth refresh handled via Next.js proxy pattern (`src/proxy.ts`) to avoid build-time client initialization errors.
+
+**Supabase SSR** — Separate browser and server clients using `@supabase/ssr`. Server client uses async cookies for session management in server components.
+
+**Realtime Messaging** — Chat threads subscribe to PostgreSQL logical replication via Supabase Realtime. Message INSERT/UPDATE events trigger instant UI updates. Presence channels handle typing indicators.
+
+**Row Level Security** — All database tables have RLS policies. Users can only read/write their own data, with public read access for posts and profiles. Chat participants can access their shared conversations.
+
+**AI Fallback Strategy** — Gemini API calls attempt multiple models (`gemini-2.0-flash`, `gemini-2.5-flash`, `gemini-pro`) in sequence. If all fail or the API key is missing, keyword-based logic provides graceful degradation.
+
+**Read Receipts via SECURITY DEFINER** — A PostgreSQL function with elevated privileges allows chat participants to mark messages from others as read while preventing modification of message content.
+
+**Cascade Deletion** — Foreign key constraints with `ON DELETE CASCADE` ensure data consistency. Deleting a user removes their posts, chats, messages, and saved posts. Deleting a post removes associated chats and messages.
+
+**Optimistic UI** — Chat messages update local state immediately on send, with realtime subscriptions handling server confirmation. Typing indicators sync via presence state.
+
+---
 
 ## Architecture
 
 ```mermaid
 graph TB
-    subgraph "Frontend"
-        A[Next.js 16 App Router] --> B[React 19 Components]
-        B --> C[Tailwind CSS]
-        B --> D[Framer Motion]
-    end
-    
-    subgraph "Backend"
-        E[Supabase Auth] --> F[Supabase Database]
-        E --> G[Supabase Storage]
-        E --> H[Supabase Realtime]
-    end
-    
-    subgraph "AI Services"
-        I[Google Gemini API] --> J[Category Classification]
-        I --> K[Description Generation]
-    end
-    
-    A --> E
-    A --> F
-    A --> G
-    A --> H
-    A --> I
+    Browser[Browser]
+    NextJS[Next.js 16 App Router]
+    Supabase[Supabase]
+    Auth[Supabase Auth]
+    PostgreSQL[PostgreSQL]
+    Storage[Supabase Storage]
+    Realtime[Supabase Realtime]
+    Gemini[Google Gemini API]
+
+    Browser --> NextJS
+    NextJS --> Auth
+    NextJS --> PostgreSQL
+    NextJS --> Storage
+    NextJS --> Realtime
+    NextJS --> Gemini
+
+    Auth --> PostgreSQL
+    Realtime --> PostgreSQL
 ```
+
+**Frontend:** Next.js 16 with React Server Components. Client-side state managed via React hooks. Tailwind CSS for styling, Framer Motion and GSAP for animations.
+
+**Backend:** Supabase provides Auth, PostgreSQL database, object storage, and realtime subscriptions. No custom backend server — all database operations go through Supabase client libraries.
+
+**AI:** Google Gemini API called from Next.js API routes (`/api/autoCategorize`, `/api/generateDescription`). Multimodal models analyze images and text together.
+
+**Storage:** Three public buckets — `post-images` for listings, `avatars` for profile photos, `chat-media` for chat attachments. 5MB upload limit enforced via Zod validation.
+
+---
+
+## Database Schema
+
+**Users** → **Posts** → **Chats** → **Messages**
+
+Users create posts. Posts can have associated chats between the seller and interested buyers. Chats contain messages exchanged between participants.
+
+**Key Relationships:**
+
+- `users.id` references `auth.users` (Supabase Auth)
+- `posts.user_id` → `users.id` (CASCADE delete)
+- `chats.user1_id`, `chats.user2_id` → `users.id` (CASCADE delete)
+- `chats.post_id` → `posts.id` (CASCADE delete)
+- `messages.chat_id` → `chats.id` (CASCADE delete)
+- `messages.sender_id` → `users.id` (CASCADE delete)
+- `saved_posts.user_id` → `users.id`, `saved_posts.post_id` → `posts.id` (CASCADE delete)
+
+**Additional Tables:**
+
+- `saved_posts` — User bookmarks with unique constraint on (user_id, post_id)
+- `feedback` — User ratings (1-5) with optional message
+- `blocked_users` — User blocking with unique constraint on (blocker_id, blocked_id)
+
+**Security Model:**
+
+RLS policies restrict access based on `auth.uid()`. Public read access for posts and user profiles. Write access limited to own data. Chat participants can read their shared conversations. The `mark_messages_read` function uses SECURITY DEFINER to bypass RLS for read receipts while validating participation.
+
+---
+
+## AI Implementation
+
+**Provider:** Google Gemini API
+
+**Features:**
+
+1. **Auto-categorization** (`/api/autoCategorize`) — Accepts title, description, and optional image URL. Returns category from: Subscription, Templates, Coupon Code, Art, Others. Multimodal analysis when image is provided.
+
+2. **Description generation** (`/api/generateDescription`) — Accepts title, image URL, and mode (selling/requesting). Returns AI-generated description. Mode-aware prompts tailor output for buyers vs sellers.
+
+**Fallback Behavior:**
+
+- Missing API key → keyword-based classification, error message for descriptions
+- API failure → keyword-based classification, error message for descriptions
+- Model unavailability → tries next model in sequence, then falls back to keywords
+
+**Data Sent:** Post title, description, and image URL. Images are fetched and base64-encoded before sending to Gemini. No user PII or chat content sent to AI.
+
+---
+
+## Realtime System
+
+**What's Realtime:** Message delivery, typing indicators, chat list updates (unread counts, last message, soft deletions).
+
+**Message Delivery:** Chat threads subscribe to `postgres_changes` events on the `messages` table. INSERT events trigger local state updates. UPDATE events handle read receipts.
+
+**Typing Indicators:** Presence channels (`presence-typing-{chatId}`) sync typing state between participants. Each user tracks their own typing status via `channel.track()`.
+
+**Unread State:** Chat table stores `unread_user1` and `unread_user2` counters. Incremented on message send, reset via `mark_messages_read` function when recipient opens chat.
+
+**Subscription Management:** `useChatMessages` hook manages message subscriptions. `subscribeToChatUpdates` handles chat list updates. Subscriptions cleaned up on unmount to prevent memory leaks.
+
+**Blocking Integration:** Realtime message subscriptions check if sender is blocked before delivering messages to local state.
+
+---
+
+## Security
+
+**Authentication:** Supabase Auth with email/password. Session management via `@supabase/ssr` with separate browser and server clients. Auth refresh proxy (`src/proxy.ts`) handles token renewal.
+
+**Row Level Security:** All tables have RLS enabled. Policies restrict access based on `auth.uid()`. Public read for posts/profiles, private write for own data.
+
+**UUID Identifiers:** All user references use UUIDs from Supabase Auth, not usernames. Prevents enumeration attacks.
+
+**Input Validation:** Zod schemas validate all form inputs (signup, signin, posts, profiles, messages). File uploads limited to 5MB and image types only.
+
+**Storage Policies:** Storage buckets have RLS policies. Public read access for images, authenticated write for own uploads.
+
+**Service Role:** Application uses anon and authenticated roles only. No service-role credentials exposed to client.
+
+**SQL Injection:** All database queries use Supabase client parameterized queries. No raw SQL concatenation.
+
+**Read Receipt Security:** `mark_messages_read` function uses SECURITY DEFINER with explicit participant verification. Only allows updating `is_read` and `read_at` fields — message content cannot be modified.
+
+---
 
 ## Tech Stack
 
-- **Frontend**: Next.js 16 (App Router), React 19, TypeScript
-- **Styling**: Tailwind CSS 4
-- **Animations**: Framer Motion, GSAP
-- **Backend**: Supabase (Auth, PostgreSQL, Storage, Realtime)
-- **AI**: Google Gemini API
-- **Forms**: React Hook Form + Zod validation
-- **Icons**: Lucide React
-- **Toasts**: react-hot-toast
+### Frontend
+- Next.js 16.0.1 (App Router)
+- React 19.2.0
+- TypeScript 5
+- Tailwind CSS 4
+- Framer Motion 12.23.24
+- GSAP 3.13.0
+- Lucide React 0.552.0
+- React Hook Form 7.66.0
+- react-hot-toast 2.6.0
 
-## Authentication Architecture
+### Backend
+- Supabase (Auth, PostgreSQL, Storage, Realtime)
+- @supabase/ssr 0.12.5
+- @supabase/supabase-js 2.78.0
 
-Xchange uses Supabase Auth with SSR support via `@supabase/ssr`:
+### AI
+- @google/generative-ai 0.24.1 (Google Gemini API)
 
-- **Browser Client**: `createBrowserClient()` for client components
-- **Server Client**: `createServerClient()` with async cookies for server components
-- **Auth Refresh Proxy**: Next.js 16 proxy pattern (`src/proxy.ts`) for session refresh
-- **Lazy Initialization**: Supabase clients are instantiated within functions/hooks to avoid build-time errors
+### Tooling
+- ESLint 9
+- Zod 4.1.12
+- bcryptjs 3.0.3
 
-## Database Model
+---
 
-### Tables
+## Project Structure
 
-**users** - User profiles linked to Supabase Auth
-- `id` (UUID, primary key, references auth.users)
-- `username` (TEXT, unique)
-- `name` (TEXT)
-- `avatar_url` (TEXT)
-- `bio` (TEXT)
-- `portfolio` (TEXT)
+```text
+src/
+├── app/                    # Next.js App Router
+│   ├── (public)/          # Public routes (signin, signup, welcome)
+│   ├── api/               # API routes (AI categorization, description)
+│   ├── chat/[id]/         # Chat thread page
+│   ├── chats/             # Chat list page
+│   ├── feed/              # Main marketplace feed
+│   ├── post/              # Post pages (new, [id])
+│   ├── profile/           # User profile page
+│   ├── layout.tsx         # Root layout
+│   └── proxy.ts           # Auth refresh proxy
+├── components/            # React components
+│   ├── ChatList.tsx       # Chat list with realtime updates
+│   ├── ChatThread.tsx     # Chat thread with messages
+│   ├── PostMenu.tsx       # Post actions (edit, delete, save)
+│   └── ...
+├── hooks/                 # Custom React hooks
+│   ├── useChatMessages.ts # Chat message subscription
+│   ├── useScrollHide.ts   # Scroll-based UI hiding
+│   └── useUser.ts         # User auth state
+├── lib/                   # Utilities
+│   ├── supabase/          # Supabase client initialization
+│   ├── db.ts              # Database operations
+│   ├── realtime.ts        # Realtime subscriptions
+│   ├── validators.ts      # Zod schemas
+│   └── ...
+└── types/                 # TypeScript type definitions
 
-**posts** - Marketplace listings
-- `id` (UUID, primary key)
-- `user_id` (UUID, references users.id)
-- `title` (TEXT)
-- `description` (TEXT)
-- `image_url` (TEXT)
-- `mode` (TEXT: 'selling' | 'requesting')
-- `price` (NUMERIC)
-- `category` (TEXT)
-- `tags` (TEXT[])
-- `created_at` (TIMESTAMPTZ)
+supabase/
+└── migrations/            # Database schema migrations
+```
 
-**chats** - Conversation threads
-- `id` (UUID, primary key)
-- `user1_id` (UUID, references users.id)
-- `user2_id` (UUID, references users.id)
-- `post_id` (UUID, references posts.id)
-- `unread_user1` (INTEGER)
-- `unread_user2` (INTEGER)
-- `deleted_by_user1` (BOOLEAN)
-- `deleted_by_user2` (BOOLEAN)
-- `last_message` (TEXT)
-- `last_sender_id` (UUID)
-- `updated_at` (TIMESTAMPTZ)
+---
 
-**messages** - Chat messages
-- `id` (UUID, primary key)
-- `chat_id` (UUID, references chats.id)
-- `sender_id` (UUID, references users.id)
-- `body` (TEXT)
-- `type` (TEXT: 'text' | 'media')
-- `is_read` (BOOLEAN)
-- `read_at` (TIMESTAMPTZ)
-- `created_at` (TIMESTAMPTZ)
-
-**saved_posts** - User bookmarks
-- `id` (UUID, primary key)
-- `user_id` (UUID, references users.id)
-- `post_id` (UUID, references posts.id)
-- `created_at` (TIMESTAMPTZ)
-
-**feedback** - User feedback
-- `id` (UUID, primary key)
-- `user_id` (UUID, references users.id)
-- `rating` (INTEGER, 1-5)
-- `message` (TEXT)
-- `created_at` (TIMESTAMPTZ)
-
-**blocked_users** - User blocking
-- `id` (UUID, primary key)
-- `blocker_id` (UUID, references users.id)
-- `blocked_id` (UUID, references users.id)
-- `created_at` (TIMESTAMPTZ)
-
-## RLS Security Model
-
-Row Level Security (RLS) is enabled on all tables:
-
-- **users**: Public read, users can update/delete own profile
-- **posts**: Public read, authenticated users can CRUD own posts
-- **chats**: Participants can read/update own chats (soft delete via UPDATE)
-- **messages**: Participants can read/insert/update messages in their chats
-- **saved_posts**: Users can CRUD own saved posts
-- **feedback**: Users can read/insert own feedback
-- **blocked_users**: Users can CRUD own blocks
-
-**Note**: The `messages` UPDATE policy currently only allows senders to update their own messages. This blocks read receipts (marking messages from other users as read). A separate migration is needed to fix this.
-
-## Realtime Architecture
-
-- **Supabase Realtime**: PostgreSQL logical replication for real-time updates
-- **Subscriptions**: 
-  - Message inserts/updates in chat threads
-  - Typing indicators via presence channels
-  - Chat updates (unread counters, deletions)
-- **Presence**: Typing state shared between participants
-- **Auto-mark Read**: Messages auto-marked as read when recipient opens chat
-
-## AI Integration
-
-**Google Gemini API** is used for:
-
-1. **Category Classification** (`/api/autoCategorize`):
-   - Analyzes post title, description, and image
-   - Classifies into: Subscription, Templates, Coupon Code, Art, Others
-   - Falls back to keyword-based classification if API fails
-
-2. **Description Generation** (`/api/generateDescription`):
-   - Generates compelling product descriptions from images
-   - Supports both "selling" and "requesting" modes
-   - Falls back to keyword-based templates if API fails
-
-## Storage Buckets
-
-- **post-images**: Public bucket for post photos
-- **avatars**: Public bucket for user avatars
-- **chat-media**: Public bucket for chat media uploads
-
-## Local Setup
+## Local Development
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 20+
 - npm
 - Supabase account
 
 ### Installation
 
-1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/roonakyadav/xchange-it.git
 cd xchange-it
-```
-
-2. Install dependencies:
-```bash
 npm install
 ```
 
-3. Configure environment variables in `.env.local`:
+### Environment Variables
+
+Create `.env.local`:
+
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 GEMINI_API_KEY=your-gemini-api-key
 ```
 
-4. Run database migrations:
-```bash
-supabase db push
-```
+### Database Setup
 
-5. Start development server:
-```bash
-npm run dev
-```
-
-6. Open [http://localhost:3000](http://localhost:3000)
-
-### Supabase Setup
-
-1. Create a new Supabase project
-2. Run the migrations in `supabase/migrations/` in order:
+1. Create a Supabase project
+2. Run migrations in order from `supabase/migrations/`:
    - `20240101000000_supabase_auth_setup.sql`
    - `20240101000001_core_tables.sql`
    - `20240101000002_additional_tables.sql`
    - `20240101000003_indexes_triggers.sql`
-   - `20240101000004_storage_setup.sql`
-   - `20240101000005_rls_policies.sql`
+   - `20240101000004_storage_buckets.sql`
+   - `20240101000005_realtime_config.sql`
    - `20240101000006_grants.sql`
+   - `20240101000007_read_receipt_fix.sql`
 3. Create storage buckets: `post-images`, `avatars`, `chat-media`
-4. Configure storage policies (see migration files)
+4. Enable Realtime for messages and chats tables
 
-## Development Commands
+### Development
 
 ```bash
-npm run dev          # Start development server
-npm run build        # Build for production
-npm run start        # Start production server
-npm run lint         # Run ESLint
+npm run dev
 ```
+
+Open [http://localhost:3000](http://localhost:3000)
+
+### Build
+
+```bash
+npm run build
+npm run start
+```
+
+### Lint
+
+```bash
+npm run lint
+```
+
+---
+
+## Environment Variables
+
+| Variable                               | Purpose              | Required |
+| -------------------------------------- | -------------------- | -------- |
+| `NEXT_PUBLIC_SUPABASE_URL`             | Supabase project URL | Yes      |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase client key  | Yes      |
+| `GEMINI_API_KEY`                       | Gemini API access    | No*      |
+
+*Optional — AI features fall back to keyword-based logic if missing.
+
+---
 
 ## Known Limitations
 
-1. **Read Receipts**: The `messages` UPDATE policy blocks marking messages from other users as read. This needs a separate RLS policy fix.
-2. **No Tests**: The project currently has no automated tests.
-3. **Username-Based References**: Some legacy code may still reference users by username instead of UUID (mostly fixed).
-4. **AI API Key**: Gemini API key is required for AI features; fallback to keyword-based classification if missing.
-5. **Service Role**: No service-role credentials are used; all operations use anon/authenticated roles.
+- **No automated tests** — Test coverage is currently limited.
+- **AI dependency** — Categorization and description quality depend on Gemini API availability.
+- **Mobile-only navigation** — Desktop navigation exists but UI is mobile-first.
+- **No payment processing** — Marketplace facilitates connections but not transactions.
+- **Single-region deployment** — Supabase project region affects latency for global users.
+- **No message encryption** — Chat messages stored in plain text in PostgreSQL.
 
-## Project Structure
+---
 
-```
-src/
-├── app/                    # Next.js App Router
-│   ├── (public)/          # Public routes
-│   │   ├── signin/        # Login
-│   │   ├── signup/        # Registration
-│   │   └── welcome/       # Welcome animation
-│   ├── api/               # API routes
-│   │   ├── autoCategorize/ # AI categorization
-│   │   └── generateDescription/ # AI description generation
-│   ├── chat/[id]/         # Chat thread
-│   ├── chats/             # Chat list
-│   ├── feed/              # Main feed
-│   ├── post/              # Post pages
-│   │   ├── new/           # Create post
-│   │   └── [id]/          # Post details
-│   ├── profile/           # User profile
-│   ├── layout.tsx         # Root layout
-│   └── proxy.ts           # Auth refresh proxy
-├── components/            # React components
-│   ├── AppClient.tsx      # Client wrapper
-│   ├── BottomNav.tsx      # Mobile navigation
-│   ├── ChatList.tsx       # Chat list component
-│   ├── ChatMenu.tsx       # Chat menu (block/delete)
-│   ├── ChatThread.tsx     # Chat thread component
-│   ├── EditPostModal.tsx  # Edit post modal
-│   ├── MediaViewer.tsx    # Image viewer
-│   ├── NavDesktop.tsx     # Desktop navigation
-│   ├── NavMobile.tsx      # Mobile navigation
-│   ├── PostMenu.tsx       # Post menu (edit/delete/save)
-│   ├── SellingToggle.tsx  # Selling/Requesting toggle
-│   ├── TypingDots.tsx     # Typing indicator
-│   ├── Welcome.tsx        # Welcome animation
-│   ├── client-providers.tsx # Client providers
-│   └── ...
-├── hooks/                 # React hooks
-│   ├── useChatMessages.ts # Chat messages hook
-│   ├── useScrollHide.ts   # Scroll-based hide hook
-│   └── useUser.ts         # User auth hook
-├── lib/                   # Utilities
-│   ├── supabase/          # Supabase clients
-│   │   ├── client.ts      # Browser client
-│   │   └── server.ts      # Server client
-│   ├── chatUtils.ts       # Chat utilities
-│   ├── db.ts              # Database helpers
-│   ├── realtime.ts        # Realtime subscriptions
-│   ├── time.ts            # Time formatting
-│   └── validators.ts      # Zod schemas
-└── types/                 # TypeScript types
-    └── index.ts           # Type definitions
-```
+## Roadmap
 
-## Security Considerations
+**Completed**
+- Real-time chat with typing indicators
+- AI-powered categorization and description generation
+- User profiles with avatar uploads
+- Saved posts and user blocking
+- Read receipts via SECURITY DEFINER function
 
-- **RLS Enabled**: All tables have Row Level Security enabled
-- **No Service Role**: Application uses anon/authenticated roles only
-- **UUID-based IDs**: All user references use UUIDs, not usernames
-- **Input Validation**: Zod schemas for form validation
-- **File Upload Limits**: 5MB limit on image uploads
-- **Auth Proxy**: Next.js 16 proxy pattern for secure session refresh
+**Planned**
+- Message search and filtering
+- In-app notifications
+- Multi-image support for posts
+- Video chat integration
+- Escrow-style payment system
+
+---
+
+## Development Notes
+
+**Auth Session Architecture** — Supabase clients are lazy-initialized to avoid build-time errors. Server client uses async cookies from Next.js headers. Auth refresh proxy (`src/proxy.ts`) handles token renewal without exposing service role keys.
+
+**Realtime Subscription Lifecycle** — Subscriptions created in `useEffect` with cleanup functions. Channel references stored in `useRef` to prevent duplicate subscriptions. Status tracking (`SUBSCRIBED`, `CLOSED`) for debugging.
+
+**Image Upload Flow** — Files validated via Zod (5MB limit, image types only). Uploaded to Supabase Storage via `supabase.storage.from().upload()`. Public URL returned and stored in database. Cascade deletion removes files when posts/users deleted.
+
+**AI Fallback Logic** — API routes try multiple Gemini models in sequence. If all fail or API key missing, keyword-based classification uses regex patterns on title/description. Description generation returns error message if AI unavailable.
+
+**RLS Decisions** — Public read for posts/profiles enables marketplace discovery. Private write for own data prevents unauthorized modifications. Chat participants can access shared conversations via subquery in RLS policy.
+
+**Validation Architecture** — Zod schemas define all input shapes. Server-side validation in API routes. Client-side validation in forms with React Hook Form resolvers. Consistent error messages across layers.
+
+---
+
+## Contributing
+
+Contributions are welcome. Please ensure all tests pass and follow the existing code style.
+
+---
+
+## License
+
+This project is not currently licensed. Contact the author for usage permissions.
+
+---
+
+## Author
+
+[roonakyadav](https://github.com/roonakyadav)
